@@ -21,14 +21,12 @@ namespace SpectrumArchiveReader
         protected RadioButton readModeStandard;
         protected RadioButton readModeFast;
         private int showCatFromTrackNumber = 162;
-        protected int loadImageSize = 0;
         private TrDosImage TrDosImage { get { return (TrDosImage)Image; } }
         private string upperSideString;
         private TrackFormatName trackLayout;
 
         public TrDosReader(Control parent, DataRate defaultDataRate) : base(parent, 256, 16, defaultDataRate)
         {
-            filter = "TRD Files (*.trd)|*.trd|All Files (*.*)|*.*";
             upperSidePanel = new GroupBox() { Parent = parent, Left = 316, Top = 99, Width = 156, Height = 89, Text = "Upper Side Head Parameter" };
             upperSide0 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 20, Text = "Head = 0", AutoSize = true };
             upperSide1 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 43, Text = "Head = 1", AutoSize = true };
@@ -70,17 +68,6 @@ namespace SpectrumArchiveReader
         {
             if (MainForm.CatalogueForm == null) MainForm.CatalogueForm = new CatalogueForm();
             MainForm.CatalogueForm.ShowForm(TrDosImage, true);
-        }
-
-        private void SaveImage(object sender, EventArgs e)
-        {
-            if (Image == null) return;
-            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = filter };
-            saveDialog.FileName = Image.Name;
-            if (saveDialog.ShowDialog() != DialogResult.OK) return;
-            File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32));
-            Image.ResetModify();
-            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
         }
 
         protected override bool ReadParametersCustom()
@@ -178,33 +165,85 @@ namespace SpectrumArchiveReader
             Log.Info?.Out($"Образ диска создан. Имя: {value} | Размер: {size} треков ({size * SectorsOnTrack} секторов).");
         }
 
+        private void SaveImage(object sender, EventArgs e)
+        {
+            if (Image == null) return;
+            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "TRD File (*.trd)|*.trd|FDI File (*.fdi)|*.fdi" };
+            saveDialog.FileName = Image.Name;
+            if (saveDialog.ShowDialog() != DialogResult.OK) return;
+            if (saveDialog.FilterIndex == 1)
+            {
+                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32));
+            }
+            else
+            {
+                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToFdi(Params.ImageSectorLayout, null, 32));
+            }
+            Image.ResetModify();
+            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
+        }
+
         private void LoadImage(object sender, EventArgs e)
         {
             if (Image != null && Image.Modified)
             {
                 if (MessageBox.Show("Образ не был сохранен. Продолжить?", "", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
             }
-            OpenFileDialog openDialog = new OpenFileDialog() { Filter = filter };
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|FDI Files (*.fdi)|*.fdi|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
-            int size = loadImageSize;
-            if (!InputBox.InputInt32("", "Введите количество треков образа\n(0 - автоопределение)", ref size, 0, MainForm.MaxTrack)) return;
-            loadImageSize = size;
-            Image = new TrDosImage();
-            Image.Load(openDialog.FileName, size * SectorsOnTrack, map);
+            TrDosImage image = new TrDosImage();
+            int result;
+            if (openDialog.FilterIndex == 1)
+            {
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), map);
+            }
+            else if (openDialog.FilterIndex == 2)
+            {
+                string text;
+                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.TrDosSequential), out text, map);
+            }
+            else
+            {
+                result = image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential), map);
+            }
+            if (result != 0)
+            {
+                Log.Error?.Out($"Ошибка при чтении файла: {openDialog.FileName}");
+                return;
+            }
+            Image = image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
             SetEnabled();
             int loadedSize = Image.SizeTracks;
-            Log.Info?.Out($"Образ загружен. Имя: {Image.Name} | Размер: {loadedSize} треков {(size == 0 ? "(автоопределение)" : "")} | FileName: {openDialog.FileName}");
+            Log.Info?.Out($"Образ загружен. Имя: {Image.Name} | Размер: {loadedSize} треков | FileName: {openDialog.FileName}");
         }
 
         private void MergeImage(object sender, EventArgs e)
         {
-            OpenFileDialog openDialog = new OpenFileDialog() { Filter = filter };
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|FDI Files (*.fdi)|*.fdi|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             TrDosImage image = new TrDosImage();
-            image.Load(openDialog.FileName);
+            int result;
+            if (openDialog.FilterIndex == 1)
+            {
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName));
+            }
+            else if (openDialog.FilterIndex == 2)
+            {
+                string text;
+                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.TrDosSequential), out text);
+            }
+            else
+            {
+                result = image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential));
+            }
+            if (result != 0)
+            {
+                Log.Warn?.Out($"Ошибка при чтении файла: {openDialog.FileName}");
+                return;
+            }
             int addedReadSectors;
             Image.Merge(image, out addedReadSectors);
             map.Repaint();

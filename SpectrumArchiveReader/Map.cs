@@ -24,6 +24,7 @@ namespace SpectrumArchiveReader
         private Color backColor;
         private const int headerHeight = 10;
         private const int stripHeight = 5;
+        private int oldSectorArraySize;
         public event MouseEventHandler DoubleClick;
 
         public Map(int maxTrack, int sectorSize, int sectorsOnTrack, Control parent, Color backColor)
@@ -90,6 +91,7 @@ namespace SpectrumArchiveReader
             {
                 WorkMap[i] = 0;
             }
+            oldSectorArraySize = sectors.Length;
         }
 
         public void ModifySectors(int index, int length, byte[] data, SectorProcessResult[] sectors)
@@ -117,10 +119,11 @@ namespace SpectrumArchiveReader
                         break;
                 }
             }
-            for (int i = last, ilast = index + length; i < ilast; i++)
+            for (int i = sectors.Length; i < oldSectorArraySize; i++)
             {
                 WorkMap[i] = 0;
             }
+            oldSectorArraySize = sectors.Length;
         }
 
         public void Select(int trackFrom, int trackTo)

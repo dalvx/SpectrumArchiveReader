@@ -21,6 +21,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Data == null || original == null || Sectors == null) return false;
                 if (Data.Length != original.Data.Length) return true;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -38,6 +39,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int cnt = 0;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -51,6 +53,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int cnt = 0;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -64,6 +67,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int cnt = 0;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -77,6 +81,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int cnt = 0;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -93,6 +98,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int i;
                 for (i = Sectors.Length - 1; i >= 0; i--)
                 {
@@ -105,9 +111,9 @@ namespace SpectrumArchiveReader
         public string FileName;
         public string FileNameOnly { get { return Path.GetFileName(FileName); } }
 
-        public int SizeSectors { get { return Sectors.Length; } }
+        public int SizeSectors { get { return Sectors != null ? Sectors.Length : 0; } }
 
-        public int SizeTracks { get { return (int)Math.Ceiling((double)Sectors.Length / SectorsOnTrack); } }
+        public int SizeTracks { get { return Sectors != null ? (int)Math.Ceiling((double)Sectors.Length / SectorsOnTrack) : 0; } }
 
         /// <summary>
         /// Количество секторов которые не заполнены полностью нулями. Учитываются только успешно прочитанные сектора.
@@ -116,6 +122,7 @@ namespace SpectrumArchiveReader
         {
             get
             {
+                if (Sectors == null) return 0;
                 int cntr = 0;
                 for (int i = 0; i < Sectors.Length; i++)
                 {
@@ -181,17 +188,164 @@ namespace SpectrumArchiveReader
             SectorsChanged(Math.Min(oldSize, sizeSectors), Math.Abs(oldSize - sizeSectors));
         }
 
-        public void Load(string fileName, int sizeSectors = 0, Map map = null)
+        /// <summary>
+        /// 0 - Нет ошибок.
+        /// 1 - Размер файла слишком мал.
+        /// 2 - Число секторов на одном из треков не соответствует установленному числу секторов образа.
+        /// 3 - Сектор файла имеет номер отсутствующий в списке секторов установленных для образа.
+        /// 4 - Размер одного из секторов файла не соответствует размеру секторов образа.
+        /// 5 - Размер файла слишком мал и содержит не все данные содержимого секторов.
+        /// 6 - Нет сигнатуры FDI.
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="sectorLayout"></param>
+        /// <param name="map"></param>
+        /// <returns></returns>
+        public unsafe int LoadFdi(string fileName, byte[] data, TrackFormat sectorLayout, out string text, Map map = null)
         {
-            byte[] data = File.ReadAllBytes(fileName);
-            if (sizeSectors == 0)
+            text = null;
+            if (data.Length < 14) return 1;
+            if (data[0] != 'F' || data[1] != 'D' || data[2] != 'I') return 6;
+            int cylCount;
+            int textOffset;
+            int dataOffset;
+            fixed (byte* d = &data[0])
             {
-                sizeSectors = data.Length / SectorSize;
-                if (sizeSectors * SectorSize != data.Length)
+                cylCount = *(ushort*)(d + 4);
+                textOffset = *(ushort*)(d + 8);
+                dataOffset = *(ushort*)(d + 10);
+            }
+            int minFileSize = (7 + SectorsOnTrack * 7) * cylCount * 2 + 14;
+            if (data.Length < minFileSize || data.Length < textOffset + 1) return 1;
+
+            int tt = textOffset;
+            for (; tt < data.Length; tt++)
+            {
+                if (data[tt] == 0) break;
+            }
+            int textLen = tt - textOffset;
+            text = textLen > 0 ? Encoding.ASCII.GetString(data, textOffset, tt - textOffset) : null;
+
+            int sizeSectors = cylCount * SectorsOnTrack * 2;
+            Data = new byte[sizeSectors * SectorSize];
+            Sectors = new SectorProcessResult[sizeSectors];
+            int index = 14;
+            for (int track = 0; track < cylCount * 2; track++)
+            {
+                int trackOffset;
+                fixed (byte* d = &data[index])
                 {
-                    Log.Warn?.Out($"Размер файла не кратен размеру сектора. Размер: {data.Length} | FileName: {fileName}");
+                    trackOffset = *((int*)d);
+                }
+                int sectorsOnTrack = data[index + 6];
+                if (sectorsOnTrack != SectorsOnTrack) return 2;
+                index += 7;
+                for (int sector = 0; sector < sectorsOnTrack; sector++)
+                {
+                    int diskSectorNum = data[index + 2];
+                    int sectorSizeCode = data[index + 3];
+                    int sectorIndex = sectorLayout.FindSectorIndex(diskSectorNum);
+                    if (sectorIndex < 0) return 3;
+                    if (sectorLayout.Layout.Data[sectorIndex].SizeCode != sectorSizeCode) return 4;
+                    int imageSectorNum = track * SectorsOnTrack + sectorIndex;
+                    int code = data[index + 4] & 63;
+                    Sectors[imageSectorNum] = code == 0 ? SectorProcessResult.Bad : SectorProcessResult.Good;
+                    int sectorOffset;
+                    fixed (byte* d = &data[index + 5])
+                    {
+                        sectorOffset = *((ushort*)d);
+                    }
+                    if (data.Length < dataOffset + trackOffset + sectorOffset + SectorSize) return 5;
+                    Array.Copy(data, dataOffset + trackOffset + sectorOffset, Data, imageSectorNum * SectorSize, SectorSize);
+                    index += 7;
                 }
             }
+            FileName = fileName;
+            Name = Path.GetFileNameWithoutExtension(fileName);
+            Map = map;
+            SectorsChanged(0, sizeSectors);
+            original = (DiskImage)Clone();
+            return 0;
+        }
+
+        public unsafe byte[] ToFdi(TrackFormat sectorLayout, string text, int minSizeSectors)
+        {
+            int trackCount = (int)Math.Ceiling((double)Math.Max(FileSectorsSize, minSizeSectors) / SectorsOnTrack);
+            int cylCount = (int)Math.Ceiling(trackCount / 2.0);
+            int textLength = text != null ? text.Length : 0;
+            int trackCountFromCyl = cylCount * 2;
+            int dataSize = trackCountFromCyl * SectorsOnTrack * SectorSize + textLength + 1 + 7 * trackCountFromCyl + trackCountFromCyl * SectorsOnTrack * 7 + 14;
+            byte[] data = new byte[dataSize];
+            data[0] = (byte)'F';
+            data[1] = (byte)'D';
+            data[2] = (byte)'I';
+            data[4] = (byte)cylCount;
+            data[6] = 2;
+            //data[8] = 0;  // смещение текста (комментария), 2 байта. Пишется ниже.
+            //data[10] = 0; // смещение данных, 2 байта. Пишется ниже.
+            //data[12] = 0; // Длина дополнительной информации в заголовке, 2 байта. В этой версии - 0.
+            //data[14] = 0; // Дополнительная информация ("резерв для дальнейшей модернизации"). В текущей версии формата отсутствует.
+            int index = 14;
+            for (int track = 0; track < cylCount * 2; track++)
+            {
+                fixed (byte* numRef = &data[index])
+                {
+                    *((int*)numRef) = track * SectorsOnTrack * SectorSize;
+                }
+                //data[index + 4] = 0;  // 2 байта, всегда содержит 0 (резерв для модернизации формата).
+                data[index + 6] = (byte)SectorsOnTrack;
+                index += 7;
+                int sectorOffset = 0;
+                for (int sector = 0; sector < SectorsOnTrack; sector++)
+                {
+                    data[index] = (byte)(track / 2);
+                    data[index + 1] = (byte)(track & 1);
+                    data[index + 2] = (byte)sectorLayout.Layout.Data[sector].SectorNumber;
+                    data[index + 3] = (byte)sectorLayout.Layout.Data[sector].SizeCode;
+                    int sectorNum = track * SectorsOnTrack + sector;
+                    data[index + 4] = (byte)(sectorNum >= Sectors.Length || Sectors[sectorNum] == SectorProcessResult.Good ? 1 << sectorLayout.Layout.Data[sector].SizeCode : 0);
+                    fixed (byte* numRef = &data[index + 5])
+                    {
+                        *((ushort*)numRef) = (ushort)sectorOffset;
+                    }
+                    sectorOffset += sectorLayout.Layout.Data[sector].SizeBytes;
+                    index += 7;
+                }
+            }
+            int textOffset = index;
+            if (textLength > 0) Encoding.ASCII.GetBytes(text, 0, text.Length, data, textOffset);
+            int dataOffset = textOffset + textLength + 1;
+            fixed (byte* numRef = &data[8])
+            {
+                *((ushort*)numRef) = (ushort)textOffset;
+                *((ushort*)(numRef + 2)) = (ushort)dataOffset;
+            }
+            int currentSectorNum = 0;
+            int sizeSectors = FileSectorsSize;
+            for (int track = 0; track < trackCount; track++)
+            {
+                for (int sector = 0; sector < SectorsOnTrack; sector++)
+                {
+                    int sectorNum = track * SectorsOnTrack + sector;
+                    if (sectorNum < sizeSectors) Array.Copy(Data, sectorNum * SectorSize, data, currentSectorNum * SectorSize + dataOffset, SectorSize);
+                    currentSectorNum++;
+                }
+            }
+            return data;
+        }
+
+        /// <summary>
+        /// Загрузка формата аналогичного TRD.
+        /// 0 - Нет ошибок.
+        /// 1 - Размер файла не кратен размеру сектора.
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="sizeSectors"></param>
+        /// <param name="map"></param>
+        public int LoadTrd(string fileName, byte[] data, Map map = null)
+        {
+            int sizeSectors = data.Length / SectorSize;
+            if (sizeSectors * SectorSize != data.Length) return 1;
             Data = new byte[sizeSectors * SectorSize];
             Sectors = new SectorProcessResult[sizeSectors];
             FileName = fileName;
@@ -221,6 +375,15 @@ namespace SpectrumArchiveReader
             }
             SectorsChanged(0, sizeSectors);
             original = (DiskImage)Clone();
+            return 0;
+        }
+
+        public int LoadAutodetect(string fileName, TrackFormat sectorLayout, Map map = null)
+        {
+            byte[] data = File.ReadAllBytes(fileName);
+            string text;
+            if (LoadFdi(fileName, data, sectorLayout, out text, map) == 0) return 0;
+            return LoadTrd(fileName, data, map);
         }
 
         public void Merge(DiskImage image, out int addedReadSectors)

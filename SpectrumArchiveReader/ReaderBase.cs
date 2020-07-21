@@ -74,7 +74,6 @@ namespace SpectrumArchiveReader
         protected int newImageSize = 160;
         public DiskReaderParams Params;
         protected static DataRate[] dataRateArray = new DataRate[] { DataRate.FD_RATE_250K, DataRate.FD_RATE_300K, DataRate.FD_RATE_500K, DataRate.FD_RATE_1M };
-        protected string filter;
         protected string newImageName = "New Image";
         public event EventHandler OperationStarted;
         public event EventHandler OperationCompleted;

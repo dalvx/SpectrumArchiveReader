@@ -187,7 +187,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.Load(files[i]);
+                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 disk.ParseCatalogue();
                 sb.Append(disk.ToHtmlTableAsFileList("		"));
             }
@@ -298,7 +298,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.Load(files[i]);
+                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly;
                 string cat;
@@ -412,7 +412,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.Load(files[i]);
+                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
@@ -1076,7 +1076,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.Load(files[i]);
+                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 disk.ParseCatalogue();
                 for (int j = 0; j < values.Length; j++)
                 {
@@ -1134,7 +1134,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.Load(files[i]);
+                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 disk.ParseCatalogue();
                 for (int j = 0; j < bytes.Length; j++)
                 {
@@ -1173,7 +1173,7 @@ namespace SpectrumArchiveReader
             OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             TrDosImage image = new TrDosImage();
-            image.Load(openDialog.FileName);
+            image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential));
             SaveFileDialog saveDialog = new SaveFileDialog();
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
             File.WriteAllBytes(saveDialog.FileName, image.ToTrd(32));
@@ -1195,7 +1195,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.Load(files[i]);
+                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
@@ -1233,7 +1233,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.Load(files[i]);
+                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");

@@ -50,6 +50,7 @@ namespace SpectrumArchiveReader
                 int damagedFilesCount = 0;
                 for (int i = 0, adr = 0; i < 128; i++, adr += 16)
                 {
+                    if (Sectors == null || adr / SectorSize >= Sectors.Length) break;
                     if (Sectors[adr / SectorSize] != SectorProcessResult.Good) continue;
                     if (Data[adr] == 0) break;
                     int size = Data[adr + 13];
@@ -77,6 +78,7 @@ namespace SpectrumArchiveReader
                 for (int i = 0, adr = 0; i < 128; i++, adr += 16)
                 {
                     int csector = adr / SectorSize;
+                    if (Sectors == null || csector >= Sectors.Length) break;
                     if (Sectors[csector] != SectorProcessResult.Good) continue;
                     if (Data[adr] == 0) break;
                     cnt++;
@@ -113,6 +115,7 @@ namespace SpectrumArchiveReader
             }
             for (int i = 0, adr = sectorNumber * SectorSize; i < 128; i++, adr += 16)
             {
+                if (Sectors == null || adr / SectorSize >= Sectors.Length) break;
                 if (adr + 16 > Data.Length) break;
                 if (Sectors[adr / SectorSize] != SectorProcessResult.Good) continue;
                 if (strictTrdosFormat && Data[adr] == 0) break;
