@@ -13,7 +13,6 @@ namespace SpectrumArchiveReader
 
         public CpmReader(Control parent, DataRate defaultDataRate) : base(parent, 1024, 5, defaultDataRate)
         {
-            filter = "KDI Files (*.kdi)|*.kdi|All Files (*.*)|*.*";
             zeroLCL.Text = "Empty";
             map.ZeroByte = 0xE5;
             fileL.Visible = false;
@@ -67,10 +66,17 @@ namespace SpectrumArchiveReader
         private void SaveImage(object sender, EventArgs e)
         {
             if (Image == null) return;
-            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = filter };
+            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "KDI File (*.kdi)|*.kdi|FDI File (*.fdi)|*.fdi" };
             saveDialog.FileName = Image.Name;
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
-            File.WriteAllBytes(saveDialog.FileName, CpmImage.ToKdi(0));
+            if (saveDialog.FilterIndex == 1)
+            {
+                File.WriteAllBytes(saveDialog.FileName, CpmImage.ToKdi(0));
+            }
+            else
+            {
+                File.WriteAllBytes(saveDialog.FileName, CpmImage.ToFdi(Params.ImageSectorLayout, null, 0));
+            }
             Image.ResetModify();
             Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
         }
