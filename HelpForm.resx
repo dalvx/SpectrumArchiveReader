@@ -1,0 +1,181 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="richTextBox1.Text" xml:space="preserve">
+    <value>Spectrum Archive Reader
+
+Программа читает диски формата TR-DOS, CP/M и IS-DOS через драйвер fdrawcmd.sys (https://simonowen.com/fdrawcmd/).
+
+
+Терминология
+
+Обработанный сектор – сектор у которого была попытка чтения. Это либо успешно прочитанный сектор, либо bad-сектор.
+Необработанный сектор – сектор у которого не было попыток чтения. В образе TR-DOS и IS-DOS такие заполнены символом N, в CP/M - байтом 0xE5.
+Bad-сектор – сектор у которого была попытка чтения, которая оказалась неуспешной. В образе TR-DOS и IS-DOS такие заполнены символом B, в CP/M - байтом 0xE5.
+NoHeader – сектор при чтении которого была ошибка свидетельствущая о том что не был найден его заголовок. В образе TR-DOS и IS-DOS заполняется символом B, в CP/M - байтом 0xE5.
+Good-сектор – успешно прочитанный сектор.
+Нулевой сектор – Good-сектор содержащий одни нули. Для CP/M аналогом является сектор содержащий только байты 0xE5 и обозначающийся как Empty.
+
+
+Описание интерфейса
+
+•	Track From – номер трека с которого будет производиться чтение.
+•	Track To – номер трека до которого будет производиться чтение. Сам этот трек читаться не будет. Эти параметры также обозначены графически в виде толстой черной черты над картой образа. Оба этих параметра можно задать с помощью выделения мышью на карте образа. Двойной клик по карте образа – установка с 0 до 172.
+•	Read Side – читаемая сторона диска: верхняя, нижняя или обе. Влияет только на то какая сторона читается. Диск и образ всегда считаются двухсторонними.
+•	Upper Side Head Parameter – параметр Head секторов с верхней стороны диска. Если этот параметр не угадать, то верхняя сторона не будет читаться (будут ошибки NoHeader). Autodetect - автоопределение.
+•	Sector Read Attempts – количество попыток чтения сектора.
+•	Data Rate - скорость передачи данных. Можно задать в командной строке скорость выбираемую по умолчанию. Ключи: /250K, /300K, /500K, /1M.
+•	Read Mode - режим чтения. Standard - стандартный (чтение секторов последовательно с 1 по 16). Fast - быстрое чтение (определяется расположение секторов на треке и идет чтение в порядке расположения). В некоторых случаях быстрое чтение может быть медленнее чем стандартное, а на некоторых машинах и операционных системах оно не будет работать вообще и будет недоступно.
+
+
+
+Кнопки (вкладки TR-DOS, CP/M, IS-DOS):
+
+•	New – создание образа. При создании указывается размер образа в треках и его имя. Образ также создается автоматически при запуске приложения.
+•	Load – загрузка образа trd.
+•	Save – сохранить образ в формате TRD/KDI/FDI. У TRD образ сохраняется до последнего сектора, у которого была попытка чтения, включительно. Последние сектора, у которых не было попыток чтения, не сохраняются. Для TRD сохраняется минимум два трека – нулевой и первый, даже если первый трек не читался – это сделано чтобы файл мог быть прочитан в UnrealSpeccy, который выдает ошибку если TRD состоит только из нулевого трека. Для FDI необработанные сектора помечаются в файле как bad.
+•	Set Size – изменить размер образа в треках. При уменьшении размера лишние данные теряются. При увеличении – нет.
+•	Merge – слияние образов. Для этого сначала надо загрузить или создать один образ, потом нажать Merge и указать образ для слияния. В логе будет указано количество добавленных good-секторов. Можно делать слияние несколько раз. Плохие сектора в загружаемом образе TRD определяются как полностью заполненные символом B.
+•	Show Catalogue – показ каталога образа.
+•	Show Cat From Track – показ каталога с указанного трека образа. Были коммандеры которые сохраняли копию каталога на 160 или 162 трек, можно их просмотреть по этой кнопке.
+•	Read Forward – чтение диска. Читаются только те сектора, которые не были до этого успешно прочитаны. Чтение идет от Track From до Track To (не включая его и при условии невыхода за пределы образа).
+•	Read Backward - чтение диска в обратном направлении. В остальном аналогично Read Forward.
+•	Read Random Sectors – случайное чтение отдельных секторов. Читаются только сектора которые еще не читались или оказались битыми. Выбираются только в пределах Track From и Track To и только на указанной стороне (либо на обоих).
+•	Read Catalogue – чтение каталога TR-DOS (9 секторов) с диска и показ в отдельной форме. Данные не сохраняются, на имеющийся образ не влияют.
+•	Abort – прекращение чтения. Реакция происходит не сразу, а с некоторой задержкой, связанной с ожиданием завершения текущей операции драйвером.
+
+Вкладка Various:
+
+•	Build Disk Table – построение таблицы дисков (trd-образов), с указанием их размера, количества bad-секторов, файлов и поврежденных файлов, а также общая статистика – сколько секторов прочитано, сколько битых. Сохраняется в виде HTML.
+•	Build Maps – построение карт для указанных trd-образов, где отмечены хорошие, битые и нулевые сектора. Сохраняется как HTML.
+•	Build Sector Content Maps – построение карт содержимого секторов для указанных trd-образов. Определяет исходники TASM4.0 (иногда выдавая ложноположительный результат), GENS, графику/музыку (не отличая одно от другого), текст, нулевые сектора и код.
+•	Build Duplicate Maps – построение карт секторов-дубликатов. У меня были случаи когда сектор прочитывался из другого места диска, например вместо сектора 0 читался сектор 1, из-за чего происходило искажение данных, и драйвер никак не регистрировал ошибки, выдавая данные как валидные. Не помню чтобы такое было на реальном Спектруме, но на двух PC-контроллерах у меня такое встречалось минимум 7 раз из 280 000 секторов. Чтобы находить такие случаи я написал эту функцию, но она далеко неидеальна, т.к. оказалось что дублирование секторов это часто встречающаяся вещь даже на валидных данных. Строит она сектора которые по содержимому полностью совпадают друг с другом, находятся в пределах 16 секторов друг от друга и не идентифицируются как графика (у графики очень высокий процент дублей сам по себе), сохраняется как HTML.
+•	Mark Sector Unprocessed – маркировать сектор в образе как необработанный. После этого при чтении диска программа будет пытаться его прочитать. Сделал чтобы снова перечитать сектора-дубли в некоторых дисках.
+•	Build File Table – построение таблиц файлов для указанных trd-образов. Поврежденные файлы отмечаются красным цветом, указывается количество bad-секторов у них. Сохраняется как HTML.
+•	Driver Version – показывает версию установленного драйвера, тип контроллера и поддерживаемые скорости.
+
+На карте образа правой кнопкой можно вызвать контекстное меню, где есть функции маркировки секторов как необработанных.
+
+
+Обсуждение:  https://zx-pk.ru/threads/31601-spectrum-archive-reader-programma-dlya-chteniya-tr-dos-diskov.html
+
+Версия 1.0.0.12
+19 июля 2020</value>
+  </data>
+</root>
