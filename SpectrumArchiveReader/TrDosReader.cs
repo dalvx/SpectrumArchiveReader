@@ -11,34 +11,15 @@ namespace SpectrumArchiveReader
 {
     public class TrDosReader : ReaderBase
     {
-        protected Label trackLayoutL;
-        protected Label trackLayoutLV;
-        protected GroupBox upperSidePanel;
-        protected RadioButton upperSide0;
-        protected RadioButton upperSide1;
-        protected RadioButton upperSideAutodetect;
-        protected GroupBox readModePanel;
-        protected RadioButton readModeStandard;
-        protected RadioButton readModeFast;
         private int showCatFromTrackNumber = 162;
         private TrDosImage TrDosImage { get { return (TrDosImage)Image; } }
         private string upperSideString;
         private TrackFormatName trackLayout;
 
-        public TrDosReader(Control parent, DataRate defaultDataRate) : base(parent, 256, 16, defaultDataRate)
+        public TrDosReader(Control parent, DiskReaderParams dparams) : base(parent, 256, 16, dparams)
         {
-            upperSidePanel = new GroupBox() { Parent = parent, Left = 316, Top = 99, Width = 156, Height = 89, Text = "Upper Side Head Parameter" };
-            upperSide0 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 20, Text = "Head = 0", AutoSize = true };
-            upperSide1 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 43, Text = "Head = 1", AutoSize = true };
-            upperSideAutodetect = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 66, Text = "Autodetect", AutoSize = true, Checked = true };
-            readModePanel = new GroupBox() { Parent = parent, Left = 202, Top = 99, Width = 105, Height = 62, Text = "Read Mode" };
-            readModeStandard = new RadioButton() { Parent = readModePanel, Left = 6, Top = 19, Text = "Standard", AutoSize = true, Checked = !Stopwatch.IsHighResolution };
-            readModeFast = new RadioButton() { Parent = readModePanel, Left = 6, Top = 39, Text = "Fast", AutoSize = true, Checked = Stopwatch.IsHighResolution, Enabled = Stopwatch.IsHighResolution };
-            trackLayoutL = new Label() { Parent = parent, Left = 0, Top = 205, Text = "Sector Layout:", AutoSize = true };
-            trackLayoutLV = new Label() { Parent = parent, Left = 75, Top = 205, Text = "...", AutoSize = true };
-            trackLayoutL.Visible = MainForm.Dev;
-            trackLayoutLV.Visible = MainForm.Dev;
             Image = new TrDosImage(160 * SectorsOnTrack, map) { Name = "" };
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -52,7 +33,6 @@ namespace SpectrumArchiveReader
             readForward.Click += ReadForward;
             readBackward.Click += ReadBackward;
             readRandomSectors.Click += ReadRandomSectors;
-            Params.ImageSectorLayout.SetFormat(TrackFormatName.TrDosSequential);
         }
 
         private void ShowCatFromTrack(object sender, EventArgs e)
@@ -112,11 +92,8 @@ namespace SpectrumArchiveReader
                 DataRate = Params.DataRate,
                 Image = new TrDosImage(9, null),
                 SectorReadAttempts = Params.SectorReadAttempts,
-                SectorSize = Params.SectorSize,
-                SectorsOnTrack = Params.SectorsOnTrack,
                 Side = DiskSide.Both,
                 CurrentTrackFormat = new TrackFormat(TrackFormatName.TrDosSequential),
-                ImageSectorLayout = new TrackFormat(TrackFormatName.TrDosSequential),
                 ReadMode = ReadMode.Standard,
                 TrackLayoutAutodetect = false,
                 UpperSideHeadAutodetect = false,
@@ -158,6 +135,7 @@ namespace SpectrumArchiveReader
             newImageName = value;
             newImageSize = size;
             Image = new TrDosImage(size * SectorsOnTrack, map) { Name = value };
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -168,16 +146,20 @@ namespace SpectrumArchiveReader
         private void SaveImage(object sender, EventArgs e)
         {
             if (Image == null) return;
-            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "TRD File (*.trd)|*.trd|FDI File (*.fdi)|*.fdi" };
+            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "FDI File (*.fdi)|*.fdi|TRD File (*.trd)|*.trd|Modified TRD (*.trd)|*.trd" };
             saveDialog.FileName = Image.Name;
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
             if (saveDialog.FilterIndex == 1)
             {
-                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32));
+                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToFdi(null, 32));
+            }
+            else if (saveDialog.FilterIndex == 2)
+            {
+                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32, false));
             }
             else
             {
-                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToFdi(Params.ImageSectorLayout, null, 32));
+                File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32, true));
             }
             Image.ResetModify();
             Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
@@ -189,22 +171,26 @@ namespace SpectrumArchiveReader
             {
                 if (MessageBox.Show("Образ не был сохранен. Продолжить?", "", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
             }
-            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|FDI Files (*.fdi)|*.fdi|All Files (*.*)|*.*" };
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD (*.trd)|*.trd|Modified TRD (*.trd)|*.trd|FDI (*.fdi)|*.fdi|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             TrDosImage image = new TrDosImage();
             int result;
             if (openDialog.FilterIndex == 1)
             {
-                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), map);
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), false, map);
             }
             else if (openDialog.FilterIndex == 2)
             {
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), true, map);
+            }
+            else if (openDialog.FilterIndex == 3)
+            {
                 string text;
-                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.TrDosSequential), out text, map);
+                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), out text, map);
             }
             else
             {
-                result = image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential), map);
+                result = image.LoadAutodetect(openDialog.FileName, map);
             }
             if (result != 0)
             {
@@ -212,6 +198,7 @@ namespace SpectrumArchiveReader
                 return;
             }
             Image = image;
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -222,22 +209,26 @@ namespace SpectrumArchiveReader
 
         private void MergeImage(object sender, EventArgs e)
         {
-            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|FDI Files (*.fdi)|*.fdi|All Files (*.*)|*.*" };
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD (*.trd)|*.trd|Modified TRD (*.trd)|*.trd|FDI (*.fdi)|*.fdi|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             TrDosImage image = new TrDosImage();
             int result;
             if (openDialog.FilterIndex == 1)
             {
-                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName));
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), false);
             }
             else if (openDialog.FilterIndex == 2)
             {
+                result = image.LoadTrd(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), true);
+            }
+            else if (openDialog.FilterIndex == 3)
+            {
                 string text;
-                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.TrDosSequential), out text);
+                result = image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), out text);
             }
             else
             {
-                result = image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential));
+                result = image.LoadAutodetect(openDialog.FileName);
             }
             if (result != 0)
             {

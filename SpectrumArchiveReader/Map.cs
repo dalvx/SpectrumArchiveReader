@@ -11,6 +11,8 @@ namespace SpectrumArchiveReader
         public ChartArea ChartArea;
         public int TrackFrom;
         public int TrackTo;
+        public DiskImage Image;
+        public ImageStatsTable StatsTable;
         private int trackFromOld;
         private int trackToOld;
         public const int CellWidth = 6;
@@ -19,16 +21,53 @@ namespace SpectrumArchiveReader
         public int SectorsOnTrack;
         public int SectorSize;
         public byte ZeroByte;
+        public bool CanEditReadBounds = true;
         public MapCell[] WorkMap;
         private MapCell[] oldMap;
         private Color backColor;
         private const int headerHeight = 10;
         private const int stripHeight = 5;
         private int oldSectorArraySize;
-        public event MouseEventHandler DoubleClick;
+        public event EventHandler ReadBoundsChanged;
+        private bool sizeChanged;
 
-        public Map(int maxTrack, int sectorSize, int sectorsOnTrack, Control parent, Color backColor)
+        public Label TrackL;
+        public Label TrackLV;
+        public Label SectorL;
+        public Label SectorLV;
+        public Label StatusL;
+        public Label StatusLV;
+        public Label FileL;
+        public Label FileLV;
+        public Label ExtenstionLV;
+        public Label UnprocessedLC;
+        public Label UnprocessedLCL;
+        public Label GoodLC;
+        public Label GoodLCL;
+        public Label ZeroLC;
+        public Label ZeroLCL;
+        public Label CrcErrorLC;
+        public Label CrcErrorLCL;
+        public Label HeaderNotFoundLC;
+        public Label HeaderNotFoundLCL;
+        public Label ProcessingLC;
+        public Label ProcessingLCL;
+
+        private ContextMenuStrip contextMenu;
+        private ToolStripMenuItem contextMenuTopItem;
+        private ToolStripMenuItem markAsUnprocessed;
+        private ToolStripMenuItem markSelectionAsUnprocessed;
+        private ToolStripMenuItem markAsGood;
+        private ToolStripMenuItem markSelectionAsGood;
+
+        private int sector;
+        private int track;
+        private bool mapMouseLeaveIgnore;
+        private bool selecting;
+
+        public Map(int maxTrack, int sectorSize, int sectorsOnTrack, Control parent, Color backColor, ImageStatsTable statsTable)
         {
+            StatsTable = statsTable;
             MaxTrack = maxTrack;
             SectorSize = sectorSize;
             SectorsOnTrack = sectorsOnTrack;
@@ -42,11 +81,107 @@ namespace SpectrumArchiveReader
             }
             ChartArea.Size = new Size(MaxTrack * CellWidth, SectorsOnTrack * CellHeight + headerHeight);
             ChartArea.MouseDoubleClick += ChartArea_MouseDoubleClick;
+            ChartArea.MouseMove += ChartArea_MouseMove;
+            ChartArea.MouseLeave += ChartArea_MouseLeave;
+            ChartArea.MouseDown += ChartArea_MouseDown;
+            ChartArea.MouseUp += ChartArea_MouseUp;
+
+            TrackL = new Label() { Parent = parent, Left = 0, Top = 343, Text = "Track:", AutoSize = true };
+            TrackLV = new Label() { Parent = parent, Left = 35, Top = 343, Text = "...", AutoSize = true };
+            SectorL = new Label() { Parent = parent, Left = 60, Top = 343, Text = "Sector:", AutoSize = true };
+            SectorLV = new Label() { Parent = parent, Left = 98, Top = 343, Text = "...", AutoSize = true };
+            StatusL = new Label() { Parent = parent, Left = 130, Top = 343, Text = "Status:", AutoSize = true };
+            StatusLV = new Label() { Parent = parent, Left = 170, Top = 343, Text = "...", AutoSize = true };
+            FileL = new Label() { Parent = parent, Left = 250, Top = 343, Text = "File:", AutoSize = true };
+            FileLV = new Label() { Parent = parent, Left = 275, Top = 343, Text = "...", AutoSize = true };
+            ExtenstionLV = new Label() { Parent = parent, Left = 340, Top = 343, Text = "...", AutoSize = true };
+            UnprocessedLC = new Label() { Parent = parent, Left = 380, Top = 343, Width = 19, Height = 13, BackColor = Color.Wheat };
+            UnprocessedLCL = new Label() { Parent = parent, Left = 405, Top = 343, Text = "Unprocessed", AutoSize = true };
+            GoodLC = new Label() { Parent = parent, Left = 508, Top = 343, Width = 19, Height = 13, BackColor = Color.Green };
+            GoodLCL = new Label() { Parent = parent, Left = 533, Top = 343, Text = "Good", AutoSize = true };
+            ZeroLC = new Label() { Parent = parent, Left = 599, Top = 343, Width = 19, Height = 13, BackColor = Color.Gray };
+            ZeroLCL = new Label() { Parent = parent, Left = 624, Top = 343, Text = "Zero", AutoSize = true };
+            CrcErrorLC = new Label() { Parent = parent, Left = 682, Top = 343, Width = 19, Height = 13, BackColor = Color.FromArgb(175, 0, 0) };
+            CrcErrorLCL = new Label() { Parent = parent, Left = 707, Top = 343, Text = "CRC Error", AutoSize = true };
+            HeaderNotFoundLC = new Label() { Parent = parent, Left = 778, Top = 343, Width = 19, Height = 13, BackColor = Color.FromArgb(0, 0, 223) };
+            HeaderNotFoundLCL = new Label() { Parent = parent, Left = 803, Top = 343, Text = "Header Not Found", AutoSize = true };
+            ProcessingLC = new Label() { Parent = parent, Left = 920, Top = 343, Width = 19, Height = 13, BackColor = Color.Black };
+            ProcessingLCL = new Label() { Parent = parent, Left = 945, Top = 343, Text = "Reading", AutoSize = true };
+
+            contextMenu = new ContextMenuStrip();
+            contextMenuTopItem = new ToolStripMenuItem() { Enabled = false };
+            markAsUnprocessed = new ToolStripMenuItem();
+            markSelectionAsUnprocessed = new ToolStripMenuItem();
+            markAsGood = new ToolStripMenuItem();
+            markSelectionAsGood = new ToolStripMenuItem();
+            contextMenu.SuspendLayout();
+            //
+            // contextMenuStrip1
+            // 
+            contextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[]
+            {
+                contextMenuTopItem,
+                markAsUnprocessed,
+                markSelectionAsUnprocessed,
+                markAsGood,
+                markSelectionAsGood
+            });
+            contextMenu.Name = "contextMenu";
+            contextMenu.Size = new System.Drawing.Size(240, 70);
+            contextMenu.Closed += ContextMenu_Closed;
+            // 
+            // markAsUnprocessed
+            // 
+            markAsUnprocessed.Name = "markAsUnprocessed";
+            markAsUnprocessed.Size = new System.Drawing.Size(239, 22);
+            markAsUnprocessed.Text = "Mark Sector As Unprocessed";
+            markAsUnprocessed.Click += MarkAsUnprocessed_Click;
+            // 
+            // markSelectionAsUnprocessed
+            // 
+            markSelectionAsUnprocessed.Name = "markSelectionAsUnprocessed";
+            markSelectionAsUnprocessed.Size = new System.Drawing.Size(239, 22);
+            markSelectionAsUnprocessed.Text = "Mark Selection As Unprocessed";
+            markSelectionAsUnprocessed.Click += MarkSelectionAsUnprocessed_Click;
+            // 
+            // markAsGood
+            // 
+            markAsGood.Name = "markAsGood";
+            markAsGood.Size = new System.Drawing.Size(239, 22);
+            markAsGood.Text = "Mark Sector As Good";
+            markAsGood.Click += MarkAsGood_Click;
+            // 
+            // markSelectionAsGood
+            // 
+            markSelectionAsGood.Name = "markSelectionAsGood";
+            markSelectionAsGood.Size = new System.Drawing.Size(239, 22);
+            markSelectionAsGood.Text = "Mark Selection As Good";
+            markSelectionAsGood.Click += MarkSelectionAsGood_Click;
+            //\
+            contextMenu.ResumeLayout(false);
+        }
+
+        public void ChangeSize(int sectorSize, int sectorsOnTrack)
+        {
+            SectorSize = sectorSize;
+            SectorsOnTrack = sectorsOnTrack;
+            WorkMap = new MapCell[MaxTrack * SectorsOnTrack];
+            oldMap = new MapCell[MaxTrack * SectorsOnTrack];
+            trackFromOld = -1;
+            for (int i = 0; i < oldMap.Length; i++)
+            {
+                oldMap[i] = (MapCell)0xFFFF;
+            }
+            sizeChanged = true;
         }
 
         private void ChartArea_MouseDoubleClick(object sender, MouseEventArgs e)
         {
-            if (DoubleClick != null) DoubleClick(sender, e);
+            if (!CanEditReadBounds) return;
+            TrackFrom = 0;
+            TrackTo = MainForm.MaxTrack;
+            Repaint();
+            ReadBoundsChanged?.Invoke(this, null);
         }
 
         public void SetPosition(int left, int top)
@@ -242,7 +377,174 @@ namespace SpectrumArchiveReader
 
         public void Repaint()
         {
+            if (sizeChanged)
+            {
+                ChartArea.Size = new Size(MaxTrack * CellWidth, SectorsOnTrack * CellHeight + headerHeight);
+                sizeChanged = false;
+            }
             if (PaintMap()) ChartArea.Repaint();
+        }
+
+        private void ChartArea_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (Image == null) return;
+            int track;
+            int sector;
+            GetTrackSectorByMousePosition(e.X, e.Y, out track, out sector);
+            int sectorNumber = track * SectorsOnTrack + sector;
+            bool sectorSelected = sector >= 0 && sector < SectorsOnTrack && track >= 0 && track < MainForm.MaxTrack && sectorNumber < Image.SizeSectors;
+            if (selecting)
+            {
+                int minTrack = Math.Min(track, this.track);
+                minTrack = Math.Max(0, minTrack);
+                int maxTrack = Math.Max(track, this.track);
+                maxTrack = Math.Min(maxTrack, MainForm.MaxTrack);
+                if (maxTrack == minTrack) maxTrack++;
+                if (maxTrack > MainForm.MaxTrack)
+                {
+                    maxTrack--;
+                    minTrack--;
+                    if (minTrack < 0) minTrack = 0;
+                }
+                Select(minTrack, maxTrack);
+                ReadBoundsChanged?.Invoke(this, null);
+            }
+            TrackLV.Text = track.ToString();
+            if (sectorSelected)
+            {
+                int diskSector = Image.StandardFormat.Layout.Data[sector].SectorNumber;
+                SectorLV.Text = diskSector.ToString();
+                StatusLV.Text = Image.Sectors[sectorNumber].ToString();
+                if (Image is TrDosImage)
+                {
+                    FileData file = ((TrDosImage)Image).GetFileByDiskAddress(track, sector);
+                    if (file != null)
+                    {
+                        FileLV.Text = file.FileName;
+                        ExtenstionLV.Text = file.Extension.ToString();
+                    }
+                    else
+                    {
+                        FileLV.Text = "";
+                        ExtenstionLV.Text = "";
+                    }
+                    if (!selecting)
+                    {
+                        ClearHighlight(MapCell.Highlighted | MapCell.Hover);
+                        WorkMap[sectorNumber] |= MapCell.Hover;
+                        if (file != null)
+                        {
+                            int sn = file.Track * SectorsOnTrack + file.Sector;
+                            HighlightFile(sn, Math.Min(file.Size, Image.SizeSectors - sn));
+                        }
+                    }
+                }
+                else if (!selecting)
+                {
+                    ClearHighlight(MapCell.Highlighted | MapCell.Hover);
+                    WorkMap[sectorNumber] |= MapCell.Hover;
+                }
+            }
+            else
+            {
+                ClearTrackSectorFileName(false);
+                ClearHighlight(MapCell.Hover);
+            }
+            Repaint();
+        }
+
+        private void ClearTrackSectorFileName(bool clearTrack)
+        {
+            if (clearTrack) TrackLV.Text = "";
+            SectorLV.Text = "";
+            StatusLV.Text = "";
+            FileLV.Text = "";
+            ExtenstionLV.Text = "";
+        }
+
+        private void ChartArea_MouseUp(object sender, MouseEventArgs e)
+        {
+            selecting = false;
+            ClearHighlight();
+            Repaint();
+        }
+
+        private void ChartArea_MouseDown(object sender, MouseEventArgs e)
+        {
+            GetTrackSectorByMousePosition(e.X, e.Y, out track, out sector);
+            if (e.Button == MouseButtons.Right)
+            {
+                ClearHighlight(MapCell.Highlighted | MapCell.Hover);
+                int sectorNumber = track * SectorsOnTrack + sector;
+                bool sectorSelected = sector >= 0 && sector < SectorsOnTrack && track >= 0 && track < MainForm.MaxTrack && sectorNumber < Image.SizeSectors;
+                if (sectorSelected)
+                {
+                    WorkMap[sectorNumber] |= MapCell.Hover;
+                    int diskSector = Image.StandardFormat.Layout.Data[sector].SectorNumber;
+                    contextMenuTopItem.Text = $"Track: {track} Sector: {diskSector}";
+                    markAsUnprocessed.Enabled = true;
+                    markAsGood.Enabled = true;
+                }
+                else
+                {
+                    contextMenuTopItem.Text = $"Track: {track}";
+                    markAsUnprocessed.Enabled = false;
+                    markAsGood.Enabled = false;
+                }
+                Repaint();
+                mapMouseLeaveIgnore = true;
+                contextMenu.Show(ChartArea, new Point(e.X, e.Y));
+                return;
+            }
+            if (e.Button != MouseButtons.Left) return;
+            ClearHighlight();
+            if (CanEditReadBounds) selecting = true;
+            ChartArea_MouseMove(sender, e);
+        }
+
+        private void ChartArea_MouseLeave(object sender, EventArgs e)
+        {
+            if (mapMouseLeaveIgnore)
+            {
+                mapMouseLeaveIgnore = false;
+                return;
+            }
+            ClearTrackSectorFileName(true);
+            ClearHighlight(MapCell.Highlighted | MapCell.Hover);
+            Repaint();
+        }
+
+        private void MarkSelectionAsGood_Click(object sender, EventArgs e)
+        {
+            Image.SetSectorsProcessResult(SectorProcessResult.Good, TrackFrom * SectorsOnTrack, (TrackTo - TrackFrom) * SectorsOnTrack);
+            Repaint();
+            StatsTable?.Repaint();
+        }
+
+        private void MarkAsGood_Click(object sender, EventArgs e)
+        {
+            Image.SetSectorsProcessResult(SectorProcessResult.Good, track * SectorsOnTrack + sector);
+            Repaint();
+            StatsTable?.Repaint();
+        }
+
+        private void MarkSelectionAsUnprocessed_Click(object sender, EventArgs e)
+        {
+            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, TrackFrom * SectorsOnTrack, (TrackTo - TrackFrom) * SectorsOnTrack);
+            Repaint();
+            StatsTable?.Repaint();
+        }
+
+        private void MarkAsUnprocessed_Click(object sender, EventArgs e)
+        {
+            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, track * SectorsOnTrack + sector);
+            Repaint();
+            StatsTable?.Repaint();
+        }
+
+        private void ContextMenu_Closed(object sender, ToolStripDropDownClosedEventArgs e)
+        {
+            ChartArea_MouseLeave(sender, e);
         }
     }
 

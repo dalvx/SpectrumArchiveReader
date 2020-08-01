@@ -8,12 +8,14 @@ namespace SpectrumArchiveReader
     {
         public CpmImage(int sizeSectors, Map map) : base(1024, 5, sizeSectors, map)
         {
+            StandardFormat = TrackFormat.Cpm;
             ZeroByte = 0xE5;
             map?.BuildMap(Data, Sectors);
         }
 
         public CpmImage() : base(1024, 5, 0, null)
         {
+            StandardFormat = TrackFormat.Cpm;
             ZeroByte = 0xE5;
         }
 

@@ -36,36 +36,17 @@ namespace SpectrumArchiveReader
         protected Button readRandomSectors;
         protected Button abortButton;
         protected Button readCatalogue;
-        protected Label trackL;
-        protected Label trackLV;
-        protected Label sectorL;
-        protected Label sectorLV;
-        protected Label statusL;
-        protected Label statusLV;
-        protected Label fileL;
-        protected Label fileLV;
-        protected Label extenstionLV;
-        protected Label unprocessedLC;
-        protected Label unprocessedLCL;
-        protected Label goodLC;
-        protected Label goodLCL;
-        protected Label zeroLC;
-        protected Label zeroLCL;
-        protected Label crcErrorLC;
-        protected Label crcErrorLCL;
-        protected Label headerNotFoundLC;
-        protected Label headerNotFoundLCL;
-        protected Label processingLC;
-        protected Label processingLCL;
         protected Label dataRateL;
         protected ComboBox dataRate;
-        protected ContextMenuStrip contextMenu;
-        protected ToolStripMenuItem contextMenuTopItem;
-        protected ToolStripMenuItem markAsUnprocessed;
-        protected ToolStripMenuItem markSelectionAsUnprocessed;
-        protected ToolStripMenuItem markAsGood;
-        protected ToolStripMenuItem markSelectionAsGood;
-        protected bool selecting;
+        protected Label trackLayoutL;
+        protected Label trackLayoutLV;
+        protected GroupBox upperSidePanel;
+        protected RadioButton upperSide0;
+        protected RadioButton upperSide1;
+        protected RadioButton upperSideAutodetect;
+        protected GroupBox readModePanel;
+        protected RadioButton readModeStandard;
+        protected RadioButton readModeFast;
         protected bool aborted;
         protected Map map;
         protected ImageStatsTable stats;
@@ -73,7 +54,7 @@ namespace SpectrumArchiveReader
         protected DiskReader diskReader;
         protected int newImageSize = 160;
         public DiskReaderParams Params;
-        protected static DataRate[] dataRateArray = new DataRate[] { DataRate.FD_RATE_250K, DataRate.FD_RATE_300K, DataRate.FD_RATE_500K, DataRate.FD_RATE_1M };
+        public static DataRate[] DataRateArray = new DataRate[] { DataRate.FD_RATE_250K, DataRate.FD_RATE_300K, DataRate.FD_RATE_500K, DataRate.FD_RATE_1M };
         protected string newImageName = "New Image";
         public event EventHandler OperationStarted;
         public event EventHandler OperationCompleted;
@@ -90,17 +71,14 @@ namespace SpectrumArchiveReader
                 SetEnabled();
             }
         }
-        private int sector;
-        private int track;
-        private bool mapMouseLeaveIgnore;
 
-        public ReaderBase(Control parent, int sectorSize, int sectorsOnTrack, DataRate defaultDataRate)
+        public ReaderBase(Control parent, int sectorSize, int sectorsOnTrack, DiskReaderParams dparams)
         {
             Parent = parent;
             SectorSize = sectorSize;
             SectorsOnTrack = sectorsOnTrack;
             parent.SuspendLayout();
-            Params = new DiskReaderParams() { SectorSize = sectorSize, SectorsOnTrack = sectorsOnTrack };
+            Params = dparams;
             readSide = new GroupBox() { Parent = parent, Left = 202, Top = 9, Width = 105, Height = 83, Text = "Read Side" };
             side0 = new RadioButton() { Parent = readSide, Left = 6, Top = 19, Text = "Side 0", AutoSize = true };
             side1 = new RadioButton() { Parent = readSide, Left = 6, Top = 39, Text = "Side 1", AutoSize = true };
@@ -115,10 +93,10 @@ namespace SpectrumArchiveReader
             newImage = new Button() { Parent = imageGB, Left = 300, Top = 37, Width = 75, Height = 23, Text = "New" };
             loadImage = new Button() { Parent = imageGB, Left = 300, Top = 66, Width = 75, Height = 23, Text = "Load" };
             saveImage = new Button() { Parent = imageGB, Left = 300, Top = 94, Width = 75, Height = 23, Text = "Save" };
-            showCatalogue = new Button() { Parent = imageGB, Left = 10, Top = 157, Width = 96, Height = 23, Text = "Show Catalogue" };
-            showCatFromTrack = new Button() { Parent = imageGB, Left = 113, Top = 157, Width = 128, Height = 23, Text = "Show Cat From Track" };
+            showCatalogue = new Button() { Parent = imageGB, Left = 170, Top = 184, Width = 75, Height = 23, Text = "Catalogue" };
+            showCatFromTrack = new Button() { Parent = imageGB, Left = 250, Top = 184, Width = 128, Height = 23, Text = "Catalogue From Track" };
             setSize = new Button() { Parent = imageGB, Left = 10, Top = 184, Width = 75, Height = 23, Text = "Set Size" };
-            mergeImage = new Button() { Parent = imageGB, Left = 113, Top = 184, Width = 75, Height = 23, Text = "Merge" };
+            mergeImage = new Button() { Parent = imageGB, Left = 90, Top = 184, Width = 75, Height = 23, Text = "Merge" };
             readForward = new Button() { Parent = parent, Left = 549, Top = 10, Width = 96, Height = 23, Text = "Read Forward" };
             readBackward = new Button() { Parent = parent, Left = 549, Top = 36, Width = 96, Height = 23, Text = "Read Backward" };
             readRandomSectors = new Button() { Parent = parent, Left = 511, Top = 72, Width = 134, Height = 23, Text = "Read Random Sectors" };
@@ -126,136 +104,78 @@ namespace SpectrumArchiveReader
             readCatalogue = new Button() { Parent = parent, Left = 6, Top = 50, Width = 144, Height = 23, Text = "Read Catalogue" };
             dataRateL = new Label() { Parent = parent, Left = 3, Top = 10, Text = "Data Rate", AutoSize = true };
             dataRate = new ComboBox() { Parent = parent, Left = 6, Top = 26, Width = 121, Height = 21, DropDownStyle = ComboBoxStyle.DropDownList };
-            int defaultDataRateIndex = 0;
-            for (int i = 0; i < dataRateArray.Length; i++)
+            upperSidePanel = new GroupBox() { Parent = parent, Left = 316, Top = 99, Width = 156, Height = 89, Text = "Upper Side Head Parameter" };
+            upperSide0 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 20, Text = "Head = 0", AutoSize = true };
+            upperSide1 = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 43, Text = "Head = 1", AutoSize = true };
+            upperSideAutodetect = new RadioButton() { Parent = upperSidePanel, Left = 6, Top = 66, Text = "Autodetect", AutoSize = true, Checked = true };
+            readModePanel = new GroupBox() { Parent = parent, Left = 202, Top = 99, Width = 105, Height = 62, Text = "Read Mode" };
+            readModeStandard = new RadioButton() { Parent = readModePanel, Left = 6, Top = 19, Text = "Standard", AutoSize = true, Checked = !Timer.IsHighResolution };
+            readModeFast = new RadioButton() { Parent = readModePanel, Left = 6, Top = 39, Text = "Fast", AutoSize = true, Checked = Timer.IsHighResolution, Enabled = Timer.IsHighResolution };
+            trackLayoutL = new Label() { Parent = parent, Left = 0, Top = 205, Text = "Sector Layout:", AutoSize = true };
+            trackLayoutLV = new Label() { Parent = parent, Left = 75, Top = 205, Text = "...", AutoSize = true };
+            trackLayoutL.Visible = MainForm.Dev;
+            trackLayoutLV.Visible = MainForm.Dev;
+            for (int i = 0; i < DataRateArray.Length; i++)
             {
-                dataRate.Items.Add(dataRateArray[i].ToString().Replace("FD_RATE_" , ""));
-                if (dataRateArray[i] == defaultDataRate) defaultDataRateIndex = i;
+                dataRate.Items.Add(DataRateArray[i].ToString().Replace("FD_RATE_" , ""));
             }
-            dataRate.SelectedIndex = defaultDataRateIndex;
-            map = new Map(MainForm.MaxTrack, SectorSize, SectorsOnTrack, parent, Color.White);
-            map.SetPosition(0, 227);
-            map.DoubleClick += Map_HeaderDoubleClick;
-            map.ChartArea.MouseMove += ChartArea_MouseMove;
-            map.ChartArea.MouseLeave += ChartArea_MouseLeave;
-            map.ChartArea.MouseDown += ChartArea_MouseDown;
-            map.ChartArea.MouseUp += ChartArea_MouseUp;
-            map.TrackFrom = 0;
-            map.TrackTo = MainForm.MaxTrack;
-            map.Repaint();
+            FillControls();
             stats = new ImageStatsTable(imageGB, SystemColors.Window, SystemColors.ControlText);
             stats.SetPosition(6, 16);
             stats.Repaint();
+            map = new Map(MainForm.MaxTrack, SectorSize, SectorsOnTrack, parent, Color.White, stats);
+            map.SetPosition(0, 227);
+            map.ReadBoundsChanged += Map_ReadBoundsChanged;
+            map.TrackFrom = Params.TrackFrom;
+            map.TrackTo = Params.TrackTo;
+            map.Repaint();
 
-            trackL = new Label() { Parent = parent, Left = 0, Top = 343, Text = "Track:", AutoSize = true };
-            trackLV = new Label() { Parent = parent, Left = 35, Top = 343, Text = "...", AutoSize = true };
-            sectorL = new Label() { Parent = parent, Left = 60, Top = 343, Text = "Sector:", AutoSize = true };
-            sectorLV = new Label() { Parent = parent, Left = 98, Top = 343, Text = "...", AutoSize = true };
-            statusL = new Label() { Parent = parent, Left = 130, Top = 343, Text = "Status:", AutoSize = true };
-            statusLV = new Label() { Parent = parent, Left = 170, Top = 343, Text = "...", AutoSize = true };
-            fileL = new Label() { Parent = parent, Left = 250, Top = 343, Text = "File:", AutoSize = true };
-            fileLV = new Label() { Parent = parent, Left = 275, Top = 343, Text = "...", AutoSize = true };
-            extenstionLV = new Label() { Parent = parent, Left = 340, Top = 343, Text = "...", AutoSize = true };
-            unprocessedLC = new Label() { Parent = parent, Left = 380, Top = 343, Width = 19, Height = 13, BackColor = Color.Wheat };
-            unprocessedLCL = new Label() { Parent = parent, Left = 405, Top = 343, Text = "Unprocessed", AutoSize = true };
-            goodLC = new Label() { Parent = parent, Left = 508, Top = 343, Width = 19, Height = 13, BackColor = Color.Green };
-            goodLCL = new Label() { Parent = parent, Left = 533, Top = 343, Text = "Good", AutoSize = true };
-            zeroLC = new Label() { Parent = parent, Left = 599, Top = 343, Width = 19, Height = 13, BackColor = Color.Gray };
-            zeroLCL = new Label() { Parent = parent, Left = 624, Top = 343, Text = "Zero", AutoSize = true };
-            crcErrorLC = new Label() { Parent = parent, Left = 682, Top = 343, Width = 19, Height = 13, BackColor = Color.FromArgb(175, 0, 0) };
-            crcErrorLCL = new Label() { Parent = parent, Left = 707, Top = 343, Text = "CRC Error", AutoSize = true };
-            headerNotFoundLC = new Label() { Parent = parent, Left = 778, Top = 343, Width = 19, Height = 13, BackColor = Color.FromArgb(0, 0, 223) };
-            headerNotFoundLCL = new Label() { Parent = parent, Left = 803, Top = 343, Text = "Header Not Found", AutoSize = true };
-            processingLC = new Label() { Parent = parent, Left = 920, Top = 343, Width = 19, Height = 13, BackColor = Color.Black };
-            processingLCL = new Label() { Parent = parent, Left = 945, Top = 343, Text = "Reading", AutoSize = true };
-            contextMenu = new ContextMenuStrip();
-            contextMenuTopItem = new ToolStripMenuItem() { Enabled = false };
-            markAsUnprocessed = new ToolStripMenuItem();
-            markSelectionAsUnprocessed = new ToolStripMenuItem();
-            markAsGood = new ToolStripMenuItem();
-            markSelectionAsGood = new ToolStripMenuItem();
-            contextMenu.SuspendLayout();
-            //
-            // contextMenuStrip1
-            // 
-            contextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] 
-            {
-                contextMenuTopItem,
-                markAsUnprocessed,
-                markSelectionAsUnprocessed,
-                markAsGood,
-                markSelectionAsGood
-            });
-            contextMenu.Name = "contextMenu";
-            contextMenu.Size = new System.Drawing.Size(240, 70);
-            contextMenu.Closed += ContextMenu_Closed;
-            // 
-            // markAsUnprocessed
-            // 
-            markAsUnprocessed.Name = "markAsUnprocessed";
-            markAsUnprocessed.Size = new System.Drawing.Size(239, 22);
-            markAsUnprocessed.Text = "Mark Sector As Unprocessed";
-            markAsUnprocessed.Click += MarkAsUnprocessed_Click;
-            // 
-            // markSelectionAsUnprocessed
-            // 
-            markSelectionAsUnprocessed.Name = "markSelectionAsUnprocessed";
-            markSelectionAsUnprocessed.Size = new System.Drawing.Size(239, 22);
-            markSelectionAsUnprocessed.Text = "Mark Selection As Unprocessed";
-            markSelectionAsUnprocessed.Click += MarkSelectionAsUnprocessed_Click;
-            // 
-            // markAsGood
-            // 
-            markAsGood.Name = "markAsGood";
-            markAsGood.Size = new System.Drawing.Size(239, 22);
-            markAsGood.Text = "Mark Sector As Good";
-            markAsGood.Click += MarkAsGood_Click;
-            // 
-            // markSelectionAsGood
-            // 
-            markSelectionAsGood.Name = "markSelectionAsGood";
-            markSelectionAsGood.Size = new System.Drawing.Size(239, 22);
-            markSelectionAsGood.Text = "Mark Selection As Good";
-            markSelectionAsGood.Click += MarkSelectionAsGood_Click;
-            //\
             sectorReadAttempts.TextChanged += SectorReadAttempts_TextChanged;
             trackFrom.TextChanged += SectorReadAttempts_TextChanged;
             trackTo.TextChanged += SectorReadAttempts_TextChanged;
+            side0.CheckedChanged += SectorReadAttempts_TextChanged;
+            side1.CheckedChanged += SectorReadAttempts_TextChanged;
+            sideBoth.CheckedChanged += SectorReadAttempts_TextChanged;
+            dataRate.SelectedIndexChanged += SectorReadAttempts_TextChanged;
+            upperSide0.CheckedChanged += SectorReadAttempts_TextChanged;
+            upperSide1.CheckedChanged += SectorReadAttempts_TextChanged;
+            readModeStandard.CheckedChanged += SectorReadAttempts_TextChanged;
+            readModeFast.CheckedChanged += SectorReadAttempts_TextChanged;
             abortButton.Click += AbortButton;
             setSize.Click += SetSize;
-            contextMenu.ResumeLayout(false);
             parent.ResumeLayout(false);
         }
 
-        private void MarkSelectionAsGood_Click(object sender, EventArgs e)
+        private void FillControls()
         {
-            Image.SetSectorsProcessResult(SectorProcessResult.Good, map.TrackFrom * SectorsOnTrack, (map.TrackTo - map.TrackFrom) * SectorsOnTrack);
-            map.Repaint();
-            stats.Repaint();
+            side0.Checked = Params.Side == DiskSide.Side0;
+            side1.Checked = Params.Side == DiskSide.Side1;
+            sideBoth.Checked = Params.Side == DiskSide.Both;
+            sectorReadAttempts.Text = Params.SectorReadAttempts.ToString();
+            trackFrom.Text = Params.TrackFrom.ToString();
+            trackTo.Text = Params.TrackTo.ToString();
+            for (int i = 0; i < DataRateArray.Length; i++)
+            {
+                if (DataRateArray[i] == Params.DataRate)
+                {
+                    dataRate.SelectedIndex = i;
+                    break;
+                }
+            }
+            readModeStandard.Checked = Params.ReadMode == ReadMode.Standard;
+            readModeFast.Checked = Params.ReadMode == ReadMode.Fast;
+            upperSide0.Checked = Params.UpperSideHead == UpperSideHead.Head0;
+            upperSide1.Checked = Params.UpperSideHead == UpperSideHead.Head1;
+            upperSideAutodetect.Checked = Params.UpperSideHeadAutodetect;
         }
 
-        private void MarkAsGood_Click(object sender, EventArgs e)
+        private void Map_ReadBoundsChanged(object sender, EventArgs e)
         {
-            Image.SetSectorsProcessResult(SectorProcessResult.Good, track * SectorsOnTrack + sector);
-            map.Repaint();
-            stats.Repaint();
+            trackFrom.Text = map.TrackFrom.ToString();
+            trackTo.Text = map.TrackTo.ToString();
         }
 
-        private void MarkSelectionAsUnprocessed_Click(object sender, EventArgs e)
-        {
-            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, map.TrackFrom * SectorsOnTrack, (map.TrackTo - map.TrackFrom) * SectorsOnTrack);
-            map.Repaint();
-            stats.Repaint();
-        }
-
-        private void MarkAsUnprocessed_Click(object sender, EventArgs e)
-        {
-            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, track * SectorsOnTrack + sector);
-            map.Repaint();
-            stats.Repaint();
-        }
-
-        private void SectorReadAttempts_TextChanged(object sender, EventArgs e)
+        protected void SectorReadAttempts_TextChanged(object sender, EventArgs e)
         {
             ReadParameters(false);
         }
@@ -364,153 +284,9 @@ namespace SpectrumArchiveReader
                 Log.Info?.Out($"Область чтения не содержит непрочитанных секторов.");
                 return false;
             }
-            Params.DataRate = dataRateArray[dataRate.SelectedIndex];
+            Params.DataRate = DataRateArray[dataRate.SelectedIndex];
             Params.Image = Image;
             return sraValid & tfValid & tlValid & ReadParametersCustom();
-        }
-
-        private void ChartArea_MouseUp(object sender, MouseEventArgs e)
-        {
-            selecting = false;
-            map.ClearHighlight();
-            map.Repaint();
-        }
-
-        private void ChartArea_MouseDown(object sender, MouseEventArgs e)
-        {
-            map.GetTrackSectorByMousePosition(e.X, e.Y, out track, out sector);
-            if (e.Button == MouseButtons.Right)
-            {
-                map.ClearHighlight(MapCell.Highlighted | MapCell.Hover);
-                int sectorNumber = track * map.SectorsOnTrack + sector;
-                bool sectorSelected = sector >= 0 && sector < map.SectorsOnTrack && track >= 0 && track < MainForm.MaxTrack && sectorNumber < Image.SizeSectors;
-                if (sectorSelected)
-                {
-                    map.WorkMap[sectorNumber] |= MapCell.Hover;
-                    int diskSector = Params.ImageSectorLayout.Layout.Data[sector].SectorNumber;
-                    contextMenuTopItem.Text = $"Track: {track} Sector: {diskSector}";
-                    markAsUnprocessed.Enabled = true;
-                    markAsGood.Enabled = true;
-                }
-                else
-                {
-                    contextMenuTopItem.Text = $"Track: {track}";
-                    markAsUnprocessed.Enabled = false;
-                    markAsGood.Enabled = false;
-                }
-                map.Repaint();
-                mapMouseLeaveIgnore = true;
-                contextMenu.Show(map.ChartArea, new Point(e.X, e.Y));
-                return;
-            }
-            if (e.Button != MouseButtons.Left) return;
-            map.ClearHighlight();
-            selecting = true;
-            ChartArea_MouseMove(sender, e);
-        }
-
-        private void ChartArea_MouseLeave(object sender, EventArgs e)
-        {
-            if (mapMouseLeaveIgnore)
-            {
-                mapMouseLeaveIgnore = false;
-                return;
-            }
-            ClearTrackSectorFileName(true);
-            map.ClearHighlight(MapCell.Highlighted | MapCell.Hover);
-            map.Repaint();
-        }
-
-        private void ChartArea_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (Image == null) return;
-            int track;
-            int sector;
-            map.GetTrackSectorByMousePosition(e.X, e.Y, out track, out sector);
-            int sectorNumber = track * map.SectorsOnTrack + sector;
-            bool sectorSelected = sector >= 0 && sector < map.SectorsOnTrack && track >= 0 && track < MainForm.MaxTrack && sectorNumber < Image.SizeSectors;
-            if (selecting)
-            {
-                int minTrack = Math.Min(track, this.track);
-                minTrack = Math.Max(0, minTrack);
-                int maxTrack = Math.Max(track, this.track);
-                maxTrack = Math.Min(maxTrack, MainForm.MaxTrack);
-                if (maxTrack == minTrack) maxTrack++;
-                if (maxTrack > MainForm.MaxTrack)
-                {
-                    maxTrack--;
-                    minTrack--;
-                    if (minTrack < 0) minTrack = 0;
-                }
-                trackFrom.Text = minTrack.ToString();
-                trackTo.Text = maxTrack.ToString();
-                map.Select(minTrack, maxTrack);
-            }
-            trackLV.Text = track.ToString();
-            if (sectorSelected)
-            {
-                int diskSector = Params.ImageSectorLayout.Layout.Data[sector].SectorNumber;
-                sectorLV.Text = diskSector.ToString();
-                statusLV.Text = Image.Sectors[sectorNumber].ToString();
-                if (Image is TrDosImage)
-                {
-                    FileData file = ((TrDosImage)Image).GetFileByDiskAddress(track, sector);
-                    if (file != null)
-                    {
-                        fileLV.Text = file.FileName;
-                        extenstionLV.Text = file.Extension.ToString();
-                    }
-                    else
-                    {
-                        fileLV.Text = "";
-                        extenstionLV.Text = "";
-                    }
-                    if (!selecting)
-                    {
-                        map.ClearHighlight(MapCell.Highlighted | MapCell.Hover);
-                        map.WorkMap[sectorNumber] |= MapCell.Hover;
-                        if (file != null)
-                        {
-                            int sn = file.Track * map.SectorsOnTrack + file.Sector;
-                            map.HighlightFile(sn, Math.Min(file.Size, Image.SizeSectors - sn));
-                        }
-                    }
-                }
-                else if (!selecting)
-                {
-                    map.ClearHighlight(MapCell.Highlighted | MapCell.Hover);
-                    map.WorkMap[sectorNumber] |= MapCell.Hover;
-                }
-            }
-            else
-            {
-                ClearTrackSectorFileName(false);
-                map.ClearHighlight(MapCell.Hover);
-            }
-            map.Repaint();
-        }
-
-        private void ContextMenu_Closed(object sender, ToolStripDropDownClosedEventArgs e)
-        {
-            ChartArea_MouseLeave(sender, e);
-        }
-
-        private void ClearTrackSectorFileName(bool clearTrack)
-        {
-            if (clearTrack) trackLV.Text = "";
-            sectorLV.Text = "";
-            statusLV.Text = "";
-            fileLV.Text = "";
-            extenstionLV.Text = "";
-        }
-
-        private void Map_HeaderDoubleClick(object sender, MouseEventArgs e)
-        {
-            trackFrom.Text = "0";
-            trackTo.Text = MainForm.MaxTrack.ToString();
-            map.TrackFrom = 0;
-            map.TrackTo = MainForm.MaxTrack;
-            map.Repaint();
         }
     }
 }

@@ -15,25 +15,11 @@ namespace SpectrumArchiveReader
         public int SectorsOnTrack;
         public int SectorSize;
         public byte ZeroByte;
-        protected DiskImage original;
-
-        public bool Modified
-        {
-            get
-            {
-                if (Data == null || original == null || Sectors == null) return false;
-                if (Data.Length != original.Data.Length) return true;
-                for (int i = 0; i < Sectors.Length; i++)
-                {
-                    if (Sectors[i] != original.Sectors[i]) return true;
-                }
-                for (int i = 0; i < Data.Length; i++)
-                {
-                    if (Data[i] != original.Data[i]) return true;
-                }
-                return false;
-            }
-        }
+        /// <summary>
+        /// Формат трека: количество секторов, их номера и размер. Параметры Head, Cyl и расположение секторов значения не имеют.
+        /// </summary>
+        public TrackFormat StandardFormat;
+        public bool Modified;
 
         public int ProcessedSectors
         {
@@ -142,7 +128,7 @@ namespace SpectrumArchiveReader
                 Sectors = new SectorProcessResult[sizeSectors];
                 Map = map;
                 SectorsChanged(0, sizeSectors);
-                original = (DiskImage)Clone();
+                Modified = false;
             }
         }
 
@@ -198,10 +184,9 @@ namespace SpectrumArchiveReader
         /// 6 - Нет сигнатуры FDI.
         /// </summary>
         /// <param name="fileName"></param>
-        /// <param name="sectorLayout"></param>
         /// <param name="map"></param>
         /// <returns></returns>
-        public unsafe int LoadFdi(string fileName, byte[] data, TrackFormat sectorLayout, out string text, Map map = null)
+        public unsafe int LoadFdi(string fileName, byte[] data, out string text, Map map = null)
         {
             text = null;
             if (data.Length < 14) return 1;
@@ -244,9 +229,9 @@ namespace SpectrumArchiveReader
                 {
                     int diskSectorNum = data[index + 2];
                     int sectorSizeCode = data[index + 3];
-                    int sectorIndex = sectorLayout.FindSectorIndex(diskSectorNum);
+                    int sectorIndex = StandardFormat.FindSectorIndex(diskSectorNum);
                     if (sectorIndex < 0) return 3;
-                    if (sectorLayout.Layout.Data[sectorIndex].SizeCode != sectorSizeCode) return 4;
+                    if (StandardFormat.Layout.Data[sectorIndex].SizeCode != sectorSizeCode) return 4;
                     int imageSectorNum = track * SectorsOnTrack + sectorIndex;
                     int code = data[index + 4] & 63;
                     Sectors[imageSectorNum] = code == 0 ? SectorProcessResult.Bad : SectorProcessResult.Good;
@@ -264,11 +249,11 @@ namespace SpectrumArchiveReader
             Name = Path.GetFileNameWithoutExtension(fileName);
             Map = map;
             SectorsChanged(0, sizeSectors);
-            original = (DiskImage)Clone();
+            Modified = false;
             return 0;
         }
 
-        public unsafe byte[] ToFdi(TrackFormat sectorLayout, string text, int minSizeSectors)
+        public unsafe byte[] ToFdi(string text, int minSizeSectors)
         {
             int trackCount = (int)Math.Ceiling((double)Math.Max(FileSectorsSize, minSizeSectors) / SectorsOnTrack);
             int cylCount = (int)Math.Ceiling(trackCount / 2.0);
@@ -281,10 +266,10 @@ namespace SpectrumArchiveReader
             data[2] = (byte)'I';
             data[4] = (byte)cylCount;
             data[6] = 2;
-            //data[8] = 0;  // смещение текста (комментария), 2 байта. Пишется ниже.
-            //data[10] = 0; // смещение данных, 2 байта. Пишется ниже.
+            //data[8] = 0;  // Смещение текста (комментария), 2 байта. Пишется ниже.
+            //data[10] = 0; // Смещение данных, 2 байта. Пишется ниже.
             //data[12] = 0; // Длина дополнительной информации в заголовке, 2 байта. В этой версии - 0.
-            //data[14] = 0; // Дополнительная информация ("резерв для дальнейшей модернизации"). В текущей версии формата отсутствует.
+            //data[14] = 0; // Дополнительная информация ("Резерв для дальнейшей модернизации"). В текущей версии формата отсутствует.
             int index = 14;
             for (int track = 0; track < cylCount * 2; track++)
             {
@@ -300,15 +285,15 @@ namespace SpectrumArchiveReader
                 {
                     data[index] = (byte)(track / 2);
                     data[index + 1] = (byte)(track & 1);
-                    data[index + 2] = (byte)sectorLayout.Layout.Data[sector].SectorNumber;
-                    data[index + 3] = (byte)sectorLayout.Layout.Data[sector].SizeCode;
+                    data[index + 2] = (byte)StandardFormat.Layout.Data[sector].SectorNumber;
+                    data[index + 3] = (byte)StandardFormat.Layout.Data[sector].SizeCode;
                     int sectorNum = track * SectorsOnTrack + sector;
-                    data[index + 4] = (byte)(sectorNum >= Sectors.Length || Sectors[sectorNum] == SectorProcessResult.Good ? 1 << sectorLayout.Layout.Data[sector].SizeCode : 0);
+                    data[index + 4] = (byte)(sectorNum >= Sectors.Length || Sectors[sectorNum] == SectorProcessResult.Good ? 1 << StandardFormat.Layout.Data[sector].SizeCode : 0);
                     fixed (byte* numRef = &data[index + 5])
                     {
                         *((ushort*)numRef) = (ushort)sectorOffset;
                     }
-                    sectorOffset += sectorLayout.Layout.Data[sector].SizeBytes;
+                    sectorOffset += StandardFormat.Layout.Data[sector].SizeBytes;
                     index += 7;
                 }
             }
@@ -342,7 +327,7 @@ namespace SpectrumArchiveReader
         /// <param name="fileName"></param>
         /// <param name="sizeSectors"></param>
         /// <param name="map"></param>
-        public int LoadTrd(string fileName, byte[] data, Map map = null)
+        public int LoadTrd(string fileName, byte[] data, bool modifiedTrd, Map map = null)
         {
             int sizeSectors = data.Length / SectorSize;
             if (sizeSectors * SectorSize != data.Length) return 1;
@@ -353,20 +338,23 @@ namespace SpectrumArchiveReader
             Array.Copy(data, 0, Data, 0, Math.Min(data.Length, Data.Length));
             int last = Math.Min(sizeSectors, data.Length / SectorSize);
             Map = map;
-            for (int i = 0; i < last; i++)
+            if (modifiedTrd)
             {
-                int adr = i * SectorSize;
-                if (AllBytes(data, adr, SectorSize, (byte)'B'))
+                for (int i = 0; i < last; i++)
                 {
-                    Sectors[i] = SectorProcessResult.Bad;
-                }
-                else if (AllBytes(data, adr, SectorSize, (byte)'N'))
-                {
-                    Sectors[i] = SectorProcessResult.Unprocessed;
-                }
-                else
-                {
-                    Sectors[i] = SectorProcessResult.Good;
+                    int adr = i * SectorSize;
+                    if (AllBytes(data, adr, SectorSize, (byte)'B'))
+                    {
+                        Sectors[i] = SectorProcessResult.Bad;
+                    }
+                    else if (AllBytes(data, adr, SectorSize, (byte)'N'))
+                    {
+                        Sectors[i] = SectorProcessResult.Unprocessed;
+                    }
+                    else
+                    {
+                        Sectors[i] = SectorProcessResult.Good;
+                    }
                 }
             }
             for (int i = last; i < sizeSectors; i++)
@@ -374,16 +362,16 @@ namespace SpectrumArchiveReader
                 Sectors[i] = SectorProcessResult.Unprocessed;
             }
             SectorsChanged(0, sizeSectors);
-            original = (DiskImage)Clone();
+            Modified = false;
             return 0;
         }
 
-        public int LoadAutodetect(string fileName, TrackFormat sectorLayout, Map map = null)
+        public int LoadAutodetect(string fileName, Map map = null)
         {
             byte[] data = File.ReadAllBytes(fileName);
             string text;
-            if (LoadFdi(fileName, data, sectorLayout, out text, map) == 0) return 0;
-            return LoadTrd(fileName, data, map);
+            if (LoadFdi(fileName, data, out text, map) == 0) return 0;
+            return LoadTrd(fileName, data, true, map);
         }
 
         public void Merge(DiskImage image, out int addedReadSectors)
@@ -432,6 +420,18 @@ namespace SpectrumArchiveReader
                 Sectors[i] = SectorProcessResult.Good;
             }
             SectorsChanged(sectorNum, sectorCount);
+            Modified = true;
+        }
+
+        public void WriteBadSectors(int sectorNum, IntPtr memoryHandle, int sectorCount, bool noHeader)
+        {
+            Marshal.Copy(memoryHandle, Data, sectorNum * SectorSize, Math.Min(Sectors.Length - sectorNum, sectorCount) * SectorSize);
+            for (int i = sectorNum, ilast = Math.Min(sectorNum + sectorCount, Sectors.Length); i < ilast; i++)
+            {
+                Sectors[i] = noHeader ? SectorProcessResult.NoHeader : SectorProcessResult.Bad;
+            }
+            SectorsChanged(sectorNum, sectorCount);
+            Modified = true;
         }
 
         public void WriteBadSectors(int sectorNum, int sectorCount, bool noHeader)
@@ -441,6 +441,7 @@ namespace SpectrumArchiveReader
                 Sectors[i] = noHeader ? SectorProcessResult.NoHeader : SectorProcessResult.Bad;
             }
             SectorsChanged(sectorNum, sectorCount);
+            Modified = true;
         }
 
         public void SetSectorsProcessResult(SectorProcessResult processResult, int index, int length = 1)
@@ -450,11 +451,12 @@ namespace SpectrumArchiveReader
                 Sectors[i] = processResult;
             }
             SectorsChanged(index, length);
+            Modified = true;
         }
 
         public void ResetModify()
         {
-            original = (DiskImage)Clone();
+            Modified = false;
         }
 
         public static bool AllBytes(byte[] data, int index, int length, byte value)
@@ -777,5 +779,13 @@ namespace SpectrumArchiveReader
         Tasm4,
         Gens,
         Graphics
+    }
+
+    public enum FileType
+    {
+        Fdi,
+        Trd,
+        ModifiedTrd,
+        Kdi
     }
 }

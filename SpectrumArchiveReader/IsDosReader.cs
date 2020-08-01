@@ -11,16 +11,18 @@ namespace SpectrumArchiveReader
     {
         protected IsDosImage IsDosImage { get { return (IsDosImage)Image; } }
 
-        public IsDosReader(Control parent, DataRate defaultDataRate) : base(parent, 1024, 5, defaultDataRate)
+        public IsDosReader(Control parent, DiskReaderParams dparams) : base(parent, 1024, 5, dparams)
         {
-            fileL.Visible = false;
-            fileLV.Visible = false;
-            extenstionLV.Visible = false;
+            upperSidePanel.Visible = false;
+            readModePanel.Visible = false;
+            map.FileL.Visible = false;
+            map.FileLV.Visible = false;
+            map.ExtenstionLV.Visible = false;
             readCatalogue.Visible = false;
             showCatalogue.Visible = false;
             showCatFromTrack.Visible = false;
-            stats.Headers[3] = "Размер FDI:";
             Image = new IsDosImage(160 * SectorsOnTrack, map) { Name = "" };
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -31,7 +33,6 @@ namespace SpectrumArchiveReader
             readForward.Click += ReadForward;
             readBackward.Click += ReadBackward;
             readRandomSectors.Click += ReadRandomSectors;
-            Params.ImageSectorLayout.SetFormat(TrackFormatName.IsDosSequential);
         }
 
         protected override bool ReadParametersCustom()
@@ -56,6 +57,7 @@ namespace SpectrumArchiveReader
             newImageName = value;
             newImageSize = size;
             Image = new IsDosImage(size * SectorsOnTrack, map) { Name = value };
+            map.Image = Image;
             stats.Image = Image;
             SetEnabled();
             Log.Info?.Out($"Образ диска создан. Имя: {value} | Размер: {size} треков ({size * SectorsOnTrack} секторов).");
@@ -67,7 +69,7 @@ namespace SpectrumArchiveReader
             SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "FDI File (*.fdi)|*.fdi" };
             saveDialog.FileName = Image.Name;
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
-            File.WriteAllBytes(saveDialog.FileName, IsDosImage.ToFdi(Params.ImageSectorLayout, null, 0));
+            File.WriteAllBytes(saveDialog.FileName, IsDosImage.ToFdi(null, 0));
             Image.ResetModify();
             Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
         }
@@ -82,12 +84,13 @@ namespace SpectrumArchiveReader
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             IsDosImage image = new IsDosImage();
             string text;
-            if (image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.IsDosSequential), out text, map) != 0)
+            if (image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), out text, map) != 0)
             {
                 Log.Error?.Out($"Ошибка при чтении файла: {openDialog.FileName}");
                 return;
             }
             Image = image;
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -102,7 +105,7 @@ namespace SpectrumArchiveReader
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             IsDosImage image = new IsDosImage();
             string text;
-            if (image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), new TrackFormat(TrackFormatName.IsDosSequential), out text) != 0)
+            if (image.LoadFdi(openDialog.FileName, File.ReadAllBytes(openDialog.FileName), out text) != 0)
             {
                 Log.Error?.Out($"Ошибка при чтении файла: {openDialog.FileName}");
                 return;

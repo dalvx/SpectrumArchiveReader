@@ -18,13 +18,14 @@ namespace SpectrumArchiveReader
             "Имя: ",
             "Треков:",
             "Секторов:",
-            "Размер TRD:",
+            "Размер файла образа:",
             "Обработанных секторов:",
             "Необработанных секторов: ",
             "Good:",
             "Bad:",
             "Каталог прочитан:",
-            "Поврежденных файлов:"
+            "Поврежденных файлов:",
+            "Образ изменен:"
         };
         private int textHeight;
         private int nameCaptionWidth;
@@ -48,7 +49,7 @@ namespace SpectrumArchiveReader
                 oldValues[i] = new StringBuilder(64);
                 cvalues[i] = new StringBuilder(64);
             }
-            ChartArea.Size = new Size(289, 137);
+            ChartArea.Size = new Size(289, 151);
         }
 
         public void SetPosition(int left, int top)
@@ -89,30 +90,30 @@ namespace SpectrumArchiveReader
                     {
                         for (int i = 0; i < 9; i++)
                         {
-                            if (Image.Sectors[i] == SectorProcessResult.Good) goto skip;
+                            if (Image.Sectors[i] != SectorProcessResult.Good) continue;
+                            for (int u = 0; u < 9; u++)
+                            {
+                                if (image.Sectors[u] == SectorProcessResult.Good)
+                                {
+                                    if (cvalues[8].Length > 0)
+                                    {
+                                        cvalues[8].Append(',');
+                                        cvalues[8].Append(' ');
+                                    }
+                                    AppendInt(cvalues[8], u);
+                                }
+                            }
+                            goto skip;
                         }
                         cvalues[8].Append(no);
-                        cvalues[9].Append('0');
-                        return;
-                        skip:
-                        for (int i = 0; i < 9; i++)
-                        {
-                            if (image.Sectors[i] == SectorProcessResult.Good)
-                            {
-                                if (cvalues[8].Length > 0)
-                                {
-                                    cvalues[8].Append(',');
-                                    cvalues[8].Append(' ');
-                                }
-                                AppendInt(cvalues[8], i);
-                            }
-                        }
+                        skip:;
                     }
                 }
                 AppendInt(cvalues[9], image.DamagedFiles);
                 cvalues[9].Append(from);
                 AppendInt(cvalues[9], image.FileCountUntil0);
             }
+            cvalues[10].Append(Image.Modified ? yes : no);
         }
 
         public bool IsChanged()
@@ -154,7 +155,7 @@ namespace SpectrumArchiveReader
                 WinApi.DrawTextW(DC, Headers[5], Headers[5].Length, ref rect, WinApi.DT_CALCRECT);
                 maxCaptionWidth = rect.Width + 10;
             }
-            int last = Image is TrDosImage ? Headers.Length : Headers.Length - 2;
+            int last = Headers.Length;
             for (int i = 0; i < last; i++)
             {
                 WinApi.TextOutW(DC, 0, i * textHeight, Headers[i], Headers[i].Length);

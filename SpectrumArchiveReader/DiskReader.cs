@@ -5,6 +5,7 @@ using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Xml;
 
 namespace SpectrumArchiveReader
 {
@@ -17,7 +18,7 @@ namespace SpectrumArchiveReader
         private Timer scanFormatTotalTime = new Timer();
         private TrackFormat workTrackFormat = new TrackFormat(55);
         private TrackFormat longestTrackFormat = new TrackFormat(55);
-        private IntPtr driverHandle;
+        public IntPtr DriverHandle;
         private IntPtr memoryHandle;
 
         public DiskReader()
@@ -32,18 +33,18 @@ namespace SpectrumArchiveReader
 
         public bool OpenDriver()
         {
-            driverHandle = Driver.Open(Params.DataRate);
-            if ((int)driverHandle == Driver.INVALID_HANDLE_VALUE) return false;
-            memoryHandle = Driver.VirtualAlloc(Params.SectorSize);
+            DriverHandle = Driver.Open(Params.DataRate);
+            if ((int)DriverHandle == Driver.INVALID_HANDLE_VALUE) return false;
+            memoryHandle = Driver.VirtualAlloc(8192);
             if (memoryHandle == IntPtr.Zero) return false;
             return true;
         }
 
         public void CloseDriver()
         {
-            if ((int)driverHandle != Driver.INVALID_HANDLE_VALUE) Driver.Close(driverHandle);
+            if ((int)DriverHandle != Driver.INVALID_HANDLE_VALUE) Driver.Close(DriverHandle);
             if (memoryHandle != IntPtr.Zero) Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
-            driverHandle = (IntPtr)Driver.INVALID_HANDLE_VALUE;
+            DriverHandle = (IntPtr)Driver.INVALID_HANDLE_VALUE;
             memoryHandle = IntPtr.Zero;
         }
 
@@ -67,8 +68,9 @@ namespace SpectrumArchiveReader
                 MList<int> sectorArray = new MList<int>(Params.Image.SizeSectors);
                 for (int i = Params.SectorNumFrom; i < Params.SectorNumTo; i++)
                 {
-                    if (Params.Side == DiskSide.Side0 && i % 2 != 0) continue;
-                    if (Params.Side == DiskSide.Side1 && i % 2 != 1) continue;
+                    int track = i / Params.Image.SectorsOnTrack;
+                    if (Params.Side == DiskSide.Side0 && track % 2 != 0) continue;
+                    if (Params.Side == DiskSide.Side1 && track % 2 != 1) continue;
                     if (Params.Image.Sectors[i] != SectorProcessResult.Good) sectorArray.Add(i);
                 }
                 int prevCylinder = -1;
@@ -78,7 +80,7 @@ namespace SpectrumArchiveReader
                     int index = random.Next(sectorArray.Cnt);
                     int sectorNum = sectorArray.Data[index];
                     int track = sectorNum / Params.SectorsOnTrack;
-                    int sector = Params.ImageSectorLayout.Layout.Data[sectorNum - track * Params.SectorsOnTrack].SectorNumber;
+                    SectorInfo sector = Params.Image.StandardFormat.Layout.Data[sectorNum - track * Params.SectorsOnTrack];
                     int error = 23;
                     Params.Image.Map?.ClearHighlight(MapCell.Processing);
                     Params.Image.Map?.MarkAsProcessing(sectorNum);
@@ -99,6 +101,7 @@ namespace SpectrumArchiveReader
                         upperSideHeadScanned = true;
                     }
                     bool noHeader = false;
+                    bool badSectorWritten = false;
                     for (int attempt = 0; attempt < Params.SectorReadAttempts; attempt++)
                     {
                         if (Aborted) goto abort;
@@ -108,15 +111,15 @@ namespace SpectrumArchiveReader
                             int tempCylinder = cylinder + (random.Next(2) == 0 ? -1 : 1);
                             tempCylinder = Math.Max(0, tempCylinder);
                             tempCylinder = Math.Min(tempCylinder, Params.TrackTo / 2);
-                            Driver.Seek(driverHandle, tempCylinder * 2);
+                            Driver.Seek(DriverHandle, tempCylinder * 2);
                             if (Aborted) goto abort;
                             Thread.Sleep(random.Next(200)); // Ждем случайное время чтобы приехать на нужный цилиндр в случайной точке.
                         }
                         prevCylinder = cylinder;
-                        Driver.Seek(driverHandle, track);
+                        Driver.Seek(DriverHandle, track);
                         if (Aborted) goto abort;
                         sectorTimer.Start();
-                        error = Driver.ReadSector(driverHandle, memoryHandle, track, sector, upperSideHead, SectorInfo.GetSizeCode(Params.SectorSize));
+                        error = Driver.ReadSector(DriverHandle, memoryHandle, track, sector.SectorNumber, upperSideHead, sector.SizeCode);
                         sectorTimer.Stop();
                         if (error == 0) goto sectorReadSuccessfully;
                         noHeader = error == 21 || (error == 27 && sectorTimer.ElapsedMs > Params.CurrentTrackFormat.SpinTime);
@@ -125,8 +128,13 @@ namespace SpectrumArchiveReader
                             for (int u = 0; u < 30; u++)
                             {
                                 if (Aborted) goto abort;
-                                Driver.Seek(driverHandle, track);
+                                Driver.Seek(DriverHandle, track);
                             }
+                        }
+                        else if (error == 23)
+                        {
+                            Params.Image.WriteBadSectors(sectorNum, memoryHandle, 1, noHeader);
+                            badSectorWritten = true;
                         }
                         if (noHeader && track % 2 == 1 && Params.UpperSideHeadAutodetect && trackHead[track] == -1)
                         {
@@ -145,13 +153,13 @@ namespace SpectrumArchiveReader
                         }
                     }
                     failCounter++;
-                    Params.Image.WriteBadSectors(sectorNum, 1, noHeader);
+                    if (!badSectorWritten) Params.Image.WriteBadSectors(sectorNum, 1, noHeader);
                     if (error == 21)
                     {
                         for (int u = 0; u < 30; u++)
                         {
                             if (Aborted) goto abort;
-                            Driver.Seek(driverHandle, track);
+                            Driver.Seek(DriverHandle, track);
                         }
                     }
                     continue;
@@ -189,7 +197,7 @@ namespace SpectrumArchiveReader
                     int cylinder = track / 2;
                     if (cylinder != prevCylinder)
                     {
-                        Driver.Seek(driverHandle, track);
+                        Driver.Seek(DriverHandle, track);
                         if (Aborted) goto abort;
                         prevCylinder = cylinder;
                     }
@@ -201,10 +209,6 @@ namespace SpectrumArchiveReader
                         if (trackFormat.Layout.Cnt == 0)
                         {
                             Log.Info?.Out($"Заголовки не найдены. Трек: {track}");
-                            for (int i = 0; i < 30; i++)
-                            {
-                                Driver.Seek(driverHandle, track);
-                            }
                             continue;
                         }
                         else if (trackFormat.FormatName == TrackFormatName.Unrecognized)
@@ -226,6 +230,10 @@ namespace SpectrumArchiveReader
             }
         }
 
+        /// <summary>
+        /// Чтение вперед. Возвращает количество успешно прочитанных секторов.
+        /// </summary>
+        /// <returns>Количество успешно прочитанных секторов.</returns>
         public int ReadForward()
         {
             int goodSectors = Params.Image.GoodSectors;
@@ -254,7 +262,7 @@ namespace SpectrumArchiveReader
                     int cylinder = track / 2;
                     if (cylinder != prevCylinder)
                     {
-                        Driver.Seek(driverHandle, track);
+                        Driver.Seek(DriverHandle, track);
                         if (Aborted) goto abort;
                         prevCylinder = cylinder;
                     }
@@ -285,6 +293,10 @@ namespace SpectrumArchiveReader
             return Params.Image.GoodSectors - goodSectors;
         }
 
+        /// <summary>
+        /// Чтение назад. Возвращает количество успешно прочитанных секторов.
+        /// </summary>
+        /// <returns>Возвращает количество успешно прочитанных секторов.ы</returns>
         public int ReadBackward()
         {
             int goodSectors = Params.Image.GoodSectors;
@@ -314,7 +326,7 @@ namespace SpectrumArchiveReader
                     if (cylinder != prevCylinder)
                     {
                         if (Aborted) goto abort;
-                        Driver.Seek(driverHandle, track);
+                        Driver.Seek(DriverHandle, track);
                         prevCylinder = cylinder;
                     }
                     if (Params.UpperSideHeadAutodetect && !upperHeadScanned && (track & 1) != 0)
@@ -344,7 +356,7 @@ namespace SpectrumArchiveReader
             return Params.Image.GoodSectors - goodSectors;
         }
 
-        private unsafe void ReadTrack(int track, DiskReaderParams pars)
+        public unsafe void ReadTrack(int track, DiskReaderParams pars)
         {
             // Массив sectors:
             // D0 - Признак обработанного сектора при чтении трека в одной попытке. Обнуляется перед каждой попыткой чтения трека.
@@ -374,21 +386,21 @@ namespace SpectrumArchiveReader
                 int skip = 0;
                 int processedSectors = 0;
                 int sectorCounter = 0;
-                SectorInfo diskSector = new SectorInfo() { SizeCode = SectorInfo.GetSizeCode(pars.SectorSize) };
+                SectorInfo diskSector;
                 while (processedSectors < pars.SectorsOnTrack)
                 {
                     bool sync = false;
                     if (pars.ReadMode == ReadMode.Fast && pars.CurrentTrackFormat.IsSync)
                     {
-                        diskSector = pars.CurrentTrackFormat.GetNextSector(track, 0, skip, out timeAfterSync);
+                        diskSector = pars.CurrentTrackFormat.GetClosestSector(track, 0, skip, out timeAfterSync);
                         sync = true;
                     }
                     else
                     {
-                        diskSector.SectorNumber = pars.ImageSectorLayout.Layout.Data[sectorCounter].SectorNumber;
+                        diskSector = pars.Image.StandardFormat.Layout.Data[sectorCounter];
                         sectorCounter++;
                     }
-                    int sectorIndex = pars.ImageSectorLayout.FindSectorIndex(diskSector.SectorNumber);
+                    int sectorIndex = pars.Image.StandardFormat.FindSectorIndex(diskSector.SectorNumber);
                     int diskSectorNum = track * Params.SectorsOnTrack + sectorIndex;
                     skip++;
                     if ((sectors[sectorIndex] & 1) != 0) continue;
@@ -400,7 +412,8 @@ namespace SpectrumArchiveReader
                     skip = 0;
                     pars.Image.Map?.ClearHighlight(MapCell.Processing);
                     pars.Image.Map?.MarkAsProcessing(diskSectorNum);
-                    int error = Driver.ReadSector(driverHandle, memoryHandle, track, diskSector.SectorNumber, pars.UpperSideHead, diskSector.SizeCode);
+                    WinApi.RtlZeroMemory(memoryHandle, (UIntPtr)diskSector.SizeBytes);
+                    int error = Driver.ReadSector(DriverHandle, memoryHandle, track, diskSector.SectorNumber, pars.UpperSideHead, diskSector.SizeCode);
                     double curTimeSinceSync = pars.CurrentTrackFormat.Timer.ElapsedMs;
                     if (error == 0)
                     {
@@ -411,15 +424,19 @@ namespace SpectrumArchiveReader
 
                         // Проверка несовпадения расположения секторов с заданным. Работает только для TR-DOS.
 
-                        double remainderTime = curTimeSinceSync - (int)(curTimeSinceSync / pars.CurrentTrackFormat.SpinTime) * pars.CurrentTrackFormat.SpinTime;
                         if (pars.ReadMode == ReadMode.Fast
                             && pars.TrackLayoutAutodetect
                             && sync
                             && !formatScanned
                             && !missedHeaders
-                            && curTimeSinceSync < 2 * pars.CurrentTrackFormat.SpinTime
-                            && Math.Abs(remainderTime - timeAfterSync) > 6)     // 6 - половина времени сектора TR-DOS (около 12 мс).
+                            && curTimeSinceSync < 2 * pars.CurrentTrackFormat.SpinTime)
                         {
+                            double remainderTime = curTimeSinceSync;
+                            for (int t = 0; remainderTime > 0 && t < 20; remainderTime -= pars.CurrentTrackFormat.SpinTime, t++)
+                            {
+                                // 6 - половина времени сектора TR-DOS (около 12 мс).
+                                if (Math.Abs(remainderTime - timeAfterSync) <= 6) goto skip;
+                            }
                             Log.Trace?.Out($"Несовпадение расположения секторов. Calculated Time: {GP.ToString(timeAfterSync, 2)} | Real Time: {GP.ToString(curTimeSinceSync, 2)} | Remainder Time: {GP.ToString(remainderTime, 2)}");
                             formatScanned = true;
                             bool scanResult = ScanFormat(workTrackFormat, track, true);
@@ -431,6 +448,7 @@ namespace SpectrumArchiveReader
                             }
                             //pars.Image.Map?.ClearHighlight(MapCell.Scanning);
                             //findex = pars.TrackFormat.GetNextSectorIndex(track);
+                            skip:;
                         }
                     }
                     else
@@ -458,7 +476,7 @@ namespace SpectrumArchiveReader
                             for (int u = 0; u < 30; u++)
                             {
                                 if (Aborted) return;
-                                Driver.Seek(driverHandle, track);
+                                Driver.Seek(DriverHandle, track);
                             }
 
                             // Проверка параметра Head верхней стороны.
@@ -540,7 +558,7 @@ namespace SpectrumArchiveReader
                                         for (int sn = sec0Num, si = sn - track * pars.SectorsOnTrack; sn < sec0NtNum; sn++, si++)
                                         {
                                             if (pars.Image.Sectors[sn] == SectorProcessResult.Good || (sectors[si] & 1) == 1 || (sectors[si] & 2) != 0) continue;
-                                            int dSector = pars.ImageSectorLayout.Layout.Data[si].SectorNumber;
+                                            int dSector = pars.Image.StandardFormat.Layout.Data[si].SectorNumber;
                                             int sindex = workTrackFormat.FindSectorIndex(dSector);
                                             int head = pars.UpperSideHead == UpperSideHead.Head1 ? track & 1 : 0;
                                             int sizeCode = pars.CurrentTrackFormat.Layout.Data[pars.CurrentTrackFormat.FindSectorIndex(dSector)].SizeCode;
@@ -554,7 +572,7 @@ namespace SpectrumArchiveReader
                                                 }
                                                 else
                                                 {
-                                                    Log.Info?.Out($"Не совпадает Cylinder или Head в заголовке сектора {dSector} на треке {track}: {workTrackFormat.Layout.Data[sindex]}");
+                                                    Log.Info?.Out($"Не совпадает Cylinder или Head в заголовке сектора {dSector} на треке {track} (цилиндр {track / 2} сторона {track % 2}): {workTrackFormat.Layout.Data[sindex]}");
                                                 }
                                             }
                                         }
@@ -606,6 +624,11 @@ namespace SpectrumArchiveReader
                                 }
                             }
                         }
+                        else if (error == 23)
+                        {
+                            writeBad = false;
+                            pars.Image.WriteBadSectors(diskSectorNum, memoryHandle, 1, false);
+                        }
                         if (writeBad) pars.Image.WriteBadSectors(diskSectorNum, 1, noHeader);
                     }
                     if (Aborted) return;
@@ -621,6 +644,7 @@ namespace SpectrumArchiveReader
         /// При сканировании по времени оборота диска скорость диска должна быть в районе 300 об/мин, т.е. замедлять диск не надо, иначе будут ошибки.
         /// Если byLooping == true, то конец трека определяется по зацикливанию потока секторов, но сектора сканируются не менее 150 мс и не более 300 мс.
         /// 21.05.2020: Сканирование по времени работает плохо если делается при шаге головки без задержек, не находит один сектор как правило.
+        /// 25.07.2020: Диск должен быть раскручен, иначе время на раскрутку исчерпает таймаут.
         /// </summary>
         /// <param name="track"></param>
         /// <returns></returns>
@@ -641,9 +665,14 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < 55; i++)
             {
                 if (Aborted) return false;
-                if (!Driver.ReadId(driverHandle, pars, out cmdResult))
+                if (!Driver.ReadId(DriverHandle, pars, out cmdResult))
                 {
                     Log.Trace?.Out($"Функция ReadId вернула false. i={i}. LastError={Marshal.GetLastWin32Error()}");
+                    // Хак для устранения серийности ошибки при отсутствии INDX.
+                    for (int t = 0; t < 30; t++)
+                    {
+                        Driver.Seek(DriverHandle, track);
+                    }
                     break;
                 }
                 double timeMs = scanFormatStopwatch.ElapsedMs;
@@ -694,20 +723,49 @@ namespace SpectrumArchiveReader
                 head = (byte)(track & 1)
             };
             tagFD_CMD_RESULT cmdResult = new tagFD_CMD_RESULT();
-            if (!Driver.ReadId(driverHandle, pars, out cmdResult))
+            if (!Driver.ReadId(DriverHandle, pars, out cmdResult))
             {
                 Log.Trace?.Out($"Функция ReadId вернула false. Cylinder: {cmdResult.cyl} | Sector: {cmdResult.sector} | Size: {cmdResult.size} | Head: {cmdResult.head} | LastError: {Marshal.GetLastWin32Error()}");
                 return 1;
             }
-            if (cmdResult.sector < 1 || cmdResult.sector > 16 || cmdResult.size != 1)
-            {
-                Log.Trace?.Out($"Формат не TR-DOS. Cylinder: {cmdResult.cyl} | Sector: {cmdResult.sector} | Size: {cmdResult.size} | Head: {cmdResult.head}");
-                return 2;
-            }
+            //if (cmdResult.sector < 1 || cmdResult.sector > 16 || cmdResult.size != 1)
+            //{
+            //    Log.Trace?.Out($"Формат не TR-DOS. Cylinder: {cmdResult.cyl} | Sector: {cmdResult.sector} | Size: {cmdResult.size} | Head: {cmdResult.head}");
+            //    return 2;
+            //}
             trackFormat.SyncByHeader(track, cmdResult.sector);
             Log.Trace?.Out($"Cylinder: {cmdResult.cyl} | Sector: {cmdResult.sector} | Size: {cmdResult.size} | Head: {cmdResult.head}");
             result = (UpperSideHead)cmdResult.head;
             return 0;
+        }
+
+        public void DetectDiskSize(int htMaxTracks)
+        {
+            DiskImage image = Params.Image;
+            if (image.SizeTracks < htMaxTracks)
+            {
+                int realMaxTrack = image.SizeTracks;
+                int prevCylinder = (image.SizeTracks - 1) / 2;
+                for (int track = image.SizeTracks; track < htMaxTracks; track++)
+                {
+                    int cylinder = track / 2;
+                    if (cylinder != prevCylinder)
+                    {
+                        Driver.Seek(DriverHandle, track);
+                        if (Aborted) return;
+                        prevCylinder = cylinder;
+                    }
+                    if (!ScanFormat(workTrackFormat, track, true)) return;
+                    Log.Info?.Out($"Формат трека {track}: {workTrackFormat.FormatName} | {workTrackFormat.Layout.Cnt} sectors | {workTrackFormat.ToStringAsSectorArray()}");
+                    if (workTrackFormat.ContainsSectorsFrom(image.StandardFormat, cylinder))
+                    {
+                        realMaxTrack = track + 1;
+                        image.SetSize(realMaxTrack * Params.SectorsOnTrack);
+                        Params.SectorNumTo = image.SizeSectors;
+                        ReadTrack(track, Params);
+                    }
+                }
+            }
         }
     }
 
@@ -718,7 +776,6 @@ namespace SpectrumArchiveReader
         public ReadMode ReadMode;
         public bool TrackLayoutAutodetect;
         public TrackFormat CurrentTrackFormat = new TrackFormat(16);
-        public TrackFormat ImageSectorLayout = new TrackFormat(16);
         public DataRate DataRate;
         public DiskImage Image;
         public int SectorNumFrom;
@@ -731,19 +788,44 @@ namespace SpectrumArchiveReader
         /// Параметр должен быть больше нуля.
         /// </summary>
         public int SectorReadAttempts;
-        /// <summary>
-        /// Размер сектора в байтах.
-        /// </summary>
-        public int SectorSize;
-        public int SectorsOnTrack;
         public int TrackFrom;
         public int TrackTo;
+
+        public int SectorsOnTrack { get { return Image.StandardFormat.Layout.Cnt; } }
 
         public object Clone()
         {
             DiskReaderParams r = (DiskReaderParams)MemberwiseClone();
             r.CurrentTrackFormat = (TrackFormat)CurrentTrackFormat.Clone();
             return r;
+        }
+
+        public void SaveToXml(XmlTextWriter xml, string name)
+        {
+            xml.WriteStartElement(name);
+            xml.WriteAttributeString("DataRate", DataRate.ToString());
+            xml.WriteAttributeString("Side", Side.ToString());
+            xml.WriteAttributeString("ReadMode", ReadMode.ToString());
+            xml.WriteAttributeString("UpperSideHead", UpperSideHead.ToString());
+            xml.WriteAttributeString("UpperSideHeadAutodetect", UpperSideHeadAutodetect.ToString());
+            xml.WriteAttributeString("SectorReadAttempts", SectorReadAttempts.ToString());
+            xml.WriteAttributeString("TrackFrom", TrackFrom.ToString());
+            xml.WriteAttributeString("TrackTo", TrackTo.ToString());
+            xml.WriteEndElement();
+        }
+
+        public void ReadFromXml(XmlTextReader xml)
+        {
+            DataRate = (DataRate)Enum.Parse(typeof(DataRate), xml.GetAttribute("DataRate"));
+            Side = (DiskSide)Enum.Parse(typeof(DiskSide), xml.GetAttribute("Side"));
+            ReadMode = (ReadMode)Enum.Parse(typeof(ReadMode), xml.GetAttribute("ReadMode"));
+            UpperSideHead = (UpperSideHead)Enum.Parse(typeof(UpperSideHead), xml.GetAttribute("UpperSideHead"));
+            UpperSideHeadAutodetect = bool.Parse(xml.GetAttribute("UpperSideHeadAutodetect"));
+            SectorReadAttempts = Math.Max(0, int.Parse(xml.GetAttribute("SectorReadAttempts")));
+            TrackFrom = Math.Max(0, int.Parse(xml.GetAttribute("TrackFrom")));
+            TrackFrom = Math.Min(171, TrackFrom);
+            TrackTo = Math.Min(172, int.Parse(xml.GetAttribute("TrackTo")));
+            TrackTo = Math.Max(0, TrackTo);
         }
     }
 

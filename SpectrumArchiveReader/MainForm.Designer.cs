@@ -65,10 +65,48 @@
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.tabPage5 = new System.Windows.Forms.TabPage();
+            this.tabPage6 = new System.Windows.Forms.TabPage();
+            this.C_HtNumberOfReads = new System.Windows.Forms.TextBox();
+            this.label3 = new System.Windows.Forms.Label();
+            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.C_HtRandomReadOn = new System.Windows.Forms.CheckBox();
+            this.C_HtTimeout = new System.Windows.Forms.TextBox();
+            this.label9 = new System.Windows.Forms.Label();
+            this.label10 = new System.Windows.Forms.Label();
+            this.C_HtStopOnNthFail = new System.Windows.Forms.TextBox();
+            this.C_HtCpmCheckBox = new System.Windows.Forms.CheckBox();
+            this.C_HtIsDosCheckBox = new System.Windows.Forms.CheckBox();
+            this.C_HtTrDosCheckBox = new System.Windows.Forms.CheckBox();
+            this.C_HtSectorReadAttempts = new System.Windows.Forms.TextBox();
+            this.label7 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
+            this.C_HtSave = new System.Windows.Forms.Button();
+            this.C_HtDefaultImageSize = new System.Windows.Forms.TextBox();
+            this.label14 = new System.Windows.Forms.Label();
+            this.C_HtMaxTracks = new System.Windows.Forms.TextBox();
+            this.label13 = new System.Windows.Forms.Label();
+            this.C_HtAbort = new System.Windows.Forms.Button();
+            this.C_RepeatReading = new System.Windows.Forms.Button();
+            this.C_NewDisk = new System.Windows.Forms.Button();
+            this.C_HtDataRate = new System.Windows.Forms.ComboBox();
+            this.label12 = new System.Windows.Forms.Label();
+            this.C_FileTypeCpm = new System.Windows.Forms.ComboBox();
+            this.C_FilePatternCpm = new System.Windows.Forms.TextBox();
+            this.C_SelectSavePathCpm = new System.Windows.Forms.Button();
+            this.C_FileTypeIsDos = new System.Windows.Forms.ComboBox();
+            this.C_FilePatternIsDos = new System.Windows.Forms.TextBox();
+            this.C_SelectSavePathIsDos = new System.Windows.Forms.Button();
+            this.C_FileTypeTrDos = new System.Windows.Forms.ComboBox();
+            this.label5 = new System.Windows.Forms.Label();
+            this.C_FilePatternTrDos = new System.Windows.Forms.TextBox();
+            this.label4 = new System.Windows.Forms.Label();
+            this.C_SelectSavePathTrDos = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
+            this.tabPage6.SuspendLayout();
+            this.groupBox2.SuspendLayout();
             this.SuspendLayout();
             // 
             // C_BuildFileTable
@@ -343,6 +381,7 @@
             this.tabControl1.Controls.Add(this.tabPage3);
             this.tabControl1.Controls.Add(this.tabPage4);
             this.tabControl1.Controls.Add(this.tabPage5);
+            this.tabControl1.Controls.Add(this.tabPage6);
             this.tabControl1.Location = new System.Drawing.Point(0, 3);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
@@ -455,6 +494,395 @@
             this.tabPage5.Text = "IS-DOS";
             this.tabPage5.UseVisualStyleBackColor = true;
             // 
+            // tabPage6
+            // 
+            this.tabPage6.Controls.Add(this.C_HtNumberOfReads);
+            this.tabPage6.Controls.Add(this.label3);
+            this.tabPage6.Controls.Add(this.groupBox2);
+            this.tabPage6.Controls.Add(this.C_HtCpmCheckBox);
+            this.tabPage6.Controls.Add(this.C_HtIsDosCheckBox);
+            this.tabPage6.Controls.Add(this.C_HtTrDosCheckBox);
+            this.tabPage6.Controls.Add(this.C_HtSectorReadAttempts);
+            this.tabPage6.Controls.Add(this.label7);
+            this.tabPage6.Controls.Add(this.label6);
+            this.tabPage6.Controls.Add(this.C_HtSave);
+            this.tabPage6.Controls.Add(this.C_HtDefaultImageSize);
+            this.tabPage6.Controls.Add(this.label14);
+            this.tabPage6.Controls.Add(this.C_HtMaxTracks);
+            this.tabPage6.Controls.Add(this.label13);
+            this.tabPage6.Controls.Add(this.C_HtAbort);
+            this.tabPage6.Controls.Add(this.C_RepeatReading);
+            this.tabPage6.Controls.Add(this.C_NewDisk);
+            this.tabPage6.Controls.Add(this.C_HtDataRate);
+            this.tabPage6.Controls.Add(this.label12);
+            this.tabPage6.Controls.Add(this.C_FileTypeCpm);
+            this.tabPage6.Controls.Add(this.C_FilePatternCpm);
+            this.tabPage6.Controls.Add(this.C_SelectSavePathCpm);
+            this.tabPage6.Controls.Add(this.C_FileTypeIsDos);
+            this.tabPage6.Controls.Add(this.C_FilePatternIsDos);
+            this.tabPage6.Controls.Add(this.C_SelectSavePathIsDos);
+            this.tabPage6.Controls.Add(this.C_FileTypeTrDos);
+            this.tabPage6.Controls.Add(this.label5);
+            this.tabPage6.Controls.Add(this.C_FilePatternTrDos);
+            this.tabPage6.Controls.Add(this.label4);
+            this.tabPage6.Controls.Add(this.C_SelectSavePathTrDos);
+            this.tabPage6.Location = new System.Drawing.Point(4, 22);
+            this.tabPage6.Name = "tabPage6";
+            this.tabPage6.Size = new System.Drawing.Size(1033, 358);
+            this.tabPage6.TabIndex = 5;
+            this.tabPage6.Text = "HT";
+            this.tabPage6.UseVisualStyleBackColor = true;
+            // 
+            // C_HtNumberOfReads
+            // 
+            this.C_HtNumberOfReads.Location = new System.Drawing.Point(518, 109);
+            this.C_HtNumberOfReads.Name = "C_HtNumberOfReads";
+            this.C_HtNumberOfReads.Size = new System.Drawing.Size(34, 20);
+            this.C_HtNumberOfReads.TabIndex = 60;
+            this.C_HtNumberOfReads.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(422, 114);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(90, 13);
+            this.label3.TabIndex = 59;
+            this.label3.Text = "Number of Reads";
+            // 
+            // groupBox2
+            // 
+            this.groupBox2.Controls.Add(this.C_HtRandomReadOn);
+            this.groupBox2.Controls.Add(this.C_HtTimeout);
+            this.groupBox2.Controls.Add(this.label9);
+            this.groupBox2.Controls.Add(this.label10);
+            this.groupBox2.Controls.Add(this.C_HtStopOnNthFail);
+            this.groupBox2.Location = new System.Drawing.Point(558, 5);
+            this.groupBox2.Name = "groupBox2";
+            this.groupBox2.Size = new System.Drawing.Size(136, 93);
+            this.groupBox2.TabIndex = 58;
+            this.groupBox2.TabStop = false;
+            this.groupBox2.Text = "Read Random Sectors";
+            // 
+            // C_HtRandomReadOn
+            // 
+            this.C_HtRandomReadOn.AutoSize = true;
+            this.C_HtRandomReadOn.Location = new System.Drawing.Point(6, 17);
+            this.C_HtRandomReadOn.Name = "C_HtRandomReadOn";
+            this.C_HtRandomReadOn.Size = new System.Drawing.Size(63, 17);
+            this.C_HtRandomReadOn.TabIndex = 55;
+            this.C_HtRandomReadOn.Text = "Turn on";
+            this.C_HtRandomReadOn.UseVisualStyleBackColor = true;
+            this.C_HtRandomReadOn.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtTimeout
+            // 
+            this.C_HtTimeout.Location = new System.Drawing.Point(57, 40);
+            this.C_HtTimeout.Name = "C_HtTimeout";
+            this.C_HtTimeout.Size = new System.Drawing.Size(72, 20);
+            this.C_HtTimeout.TabIndex = 52;
+            this.C_HtTimeout.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Location = new System.Drawing.Point(6, 44);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(45, 13);
+            this.label9.TabIndex = 51;
+            this.label9.Text = "Timeout";
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Location = new System.Drawing.Point(6, 73);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(83, 13);
+            this.label10.TabIndex = 53;
+            this.label10.Text = "Stop on Nth Fail";
+            // 
+            // C_HtStopOnNthFail
+            // 
+            this.C_HtStopOnNthFail.Location = new System.Drawing.Point(95, 66);
+            this.C_HtStopOnNthFail.Name = "C_HtStopOnNthFail";
+            this.C_HtStopOnNthFail.Size = new System.Drawing.Size(34, 20);
+            this.C_HtStopOnNthFail.TabIndex = 54;
+            this.C_HtStopOnNthFail.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtCpmCheckBox
+            // 
+            this.C_HtCpmCheckBox.AutoSize = true;
+            this.C_HtCpmCheckBox.Location = new System.Drawing.Point(3, 77);
+            this.C_HtCpmCheckBox.Name = "C_HtCpmCheckBox";
+            this.C_HtCpmCheckBox.Size = new System.Drawing.Size(54, 17);
+            this.C_HtCpmCheckBox.TabIndex = 57;
+            this.C_HtCpmCheckBox.Text = "CP/M";
+            this.C_HtCpmCheckBox.UseVisualStyleBackColor = true;
+            this.C_HtCpmCheckBox.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtIsDosCheckBox
+            // 
+            this.C_HtIsDosCheckBox.AutoSize = true;
+            this.C_HtIsDosCheckBox.Location = new System.Drawing.Point(3, 51);
+            this.C_HtIsDosCheckBox.Name = "C_HtIsDosCheckBox";
+            this.C_HtIsDosCheckBox.Size = new System.Drawing.Size(62, 17);
+            this.C_HtIsDosCheckBox.TabIndex = 56;
+            this.C_HtIsDosCheckBox.Text = "IS-DOS";
+            this.C_HtIsDosCheckBox.UseVisualStyleBackColor = true;
+            this.C_HtIsDosCheckBox.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtTrDosCheckBox
+            // 
+            this.C_HtTrDosCheckBox.AutoSize = true;
+            this.C_HtTrDosCheckBox.Location = new System.Drawing.Point(3, 25);
+            this.C_HtTrDosCheckBox.Name = "C_HtTrDosCheckBox";
+            this.C_HtTrDosCheckBox.Size = new System.Drawing.Size(67, 17);
+            this.C_HtTrDosCheckBox.TabIndex = 55;
+            this.C_HtTrDosCheckBox.Text = "TR-DOS";
+            this.C_HtTrDosCheckBox.UseVisualStyleBackColor = true;
+            this.C_HtTrDosCheckBox.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtSectorReadAttempts
+            // 
+            this.C_HtSectorReadAttempts.Location = new System.Drawing.Point(518, 31);
+            this.C_HtSectorReadAttempts.Name = "C_HtSectorReadAttempts";
+            this.C_HtSectorReadAttempts.Size = new System.Drawing.Size(34, 20);
+            this.C_HtSectorReadAttempts.TabIndex = 50;
+            this.C_HtSectorReadAttempts.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(401, 38);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(111, 13);
+            this.label7.TabIndex = 49;
+            this.label7.Text = "Sector Read Attempts";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(74, 5);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(77, 13);
+            this.label6.TabIndex = 48;
+            this.label6.Text = "Save Directory";
+            // 
+            // C_HtSave
+            // 
+            this.C_HtSave.Location = new System.Drawing.Point(198, 132);
+            this.C_HtSave.Name = "C_HtSave";
+            this.C_HtSave.Size = new System.Drawing.Size(75, 23);
+            this.C_HtSave.TabIndex = 47;
+            this.C_HtSave.Text = "Save";
+            this.C_HtSave.UseVisualStyleBackColor = true;
+            this.C_HtSave.Click += new System.EventHandler(this.C_HtSave_Click);
+            // 
+            // C_HtDefaultImageSize
+            // 
+            this.C_HtDefaultImageSize.Location = new System.Drawing.Point(518, 57);
+            this.C_HtDefaultImageSize.Name = "C_HtDefaultImageSize";
+            this.C_HtDefaultImageSize.Size = new System.Drawing.Size(34, 20);
+            this.C_HtDefaultImageSize.TabIndex = 46;
+            this.C_HtDefaultImageSize.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label14
+            // 
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(377, 64);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(135, 13);
+            this.label14.TabIndex = 45;
+            this.label14.Text = "Default Image Size, Tracks";
+            // 
+            // C_HtMaxTracks
+            // 
+            this.C_HtMaxTracks.Location = new System.Drawing.Point(518, 83);
+            this.C_HtMaxTracks.Name = "C_HtMaxTracks";
+            this.C_HtMaxTracks.Size = new System.Drawing.Size(34, 20);
+            this.C_HtMaxTracks.TabIndex = 44;
+            this.C_HtMaxTracks.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label13
+            // 
+            this.label13.AutoSize = true;
+            this.label13.Location = new System.Drawing.Point(449, 90);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(63, 13);
+            this.label13.TabIndex = 43;
+            this.label13.Text = "Max Tracks";
+            // 
+            // C_HtAbort
+            // 
+            this.C_HtAbort.Location = new System.Drawing.Point(198, 161);
+            this.C_HtAbort.Name = "C_HtAbort";
+            this.C_HtAbort.Size = new System.Drawing.Size(75, 23);
+            this.C_HtAbort.TabIndex = 41;
+            this.C_HtAbort.Text = "Abort (Esc)";
+            this.C_HtAbort.UseVisualStyleBackColor = true;
+            this.C_HtAbort.Click += new System.EventHandler(this.C_HtAbort_Click);
+            // 
+            // C_RepeatReading
+            // 
+            this.C_RepeatReading.Location = new System.Drawing.Point(8, 161);
+            this.C_RepeatReading.Name = "C_RepeatReading";
+            this.C_RepeatReading.Size = new System.Drawing.Size(151, 23);
+            this.C_RepeatReading.TabIndex = 40;
+            this.C_RepeatReading.Text = "Repeat Reading (F5)";
+            this.C_RepeatReading.UseVisualStyleBackColor = true;
+            this.C_RepeatReading.Click += new System.EventHandler(this.C_RepeatReading_Click);
+            // 
+            // C_NewDisk
+            // 
+            this.C_NewDisk.FlatAppearance.BorderColor = System.Drawing.Color.Fuchsia;
+            this.C_NewDisk.FlatAppearance.MouseDownBackColor = System.Drawing.Color.Red;
+            this.C_NewDisk.FlatAppearance.MouseOverBackColor = System.Drawing.Color.Lime;
+            this.C_NewDisk.Location = new System.Drawing.Point(8, 132);
+            this.C_NewDisk.Name = "C_NewDisk";
+            this.C_NewDisk.Size = new System.Drawing.Size(151, 23);
+            this.C_NewDisk.TabIndex = 39;
+            this.C_NewDisk.Text = "New Disk (F4)";
+            this.C_NewDisk.UseVisualStyleBackColor = true;
+            this.C_NewDisk.Click += new System.EventHandler(this.C_NewDisk_Click);
+            // 
+            // C_HtDataRate
+            // 
+            this.C_HtDataRate.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_HtDataRate.FormattingEnabled = true;
+            this.C_HtDataRate.Items.AddRange(new object[] {
+            "250K",
+            "300K",
+            "500K",
+            "1M"});
+            this.C_HtDataRate.Location = new System.Drawing.Point(431, 5);
+            this.C_HtDataRate.Name = "C_HtDataRate";
+            this.C_HtDataRate.Size = new System.Drawing.Size(121, 21);
+            this.C_HtDataRate.TabIndex = 38;
+            this.C_HtDataRate.SelectedIndexChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label12
+            // 
+            this.label12.AutoSize = true;
+            this.label12.Location = new System.Drawing.Point(369, 13);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(56, 13);
+            this.label12.TabIndex = 21;
+            this.label12.Text = "Data Rate";
+            // 
+            // C_FileTypeCpm
+            // 
+            this.C_FileTypeCpm.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_FileTypeCpm.FormattingEnabled = true;
+            this.C_FileTypeCpm.Items.AddRange(new object[] {
+            "FDI",
+            "KDI"});
+            this.C_FileTypeCpm.Location = new System.Drawing.Point(265, 74);
+            this.C_FileTypeCpm.Name = "C_FileTypeCpm";
+            this.C_FileTypeCpm.Size = new System.Drawing.Size(98, 21);
+            this.C_FileTypeCpm.TabIndex = 20;
+            this.C_FileTypeCpm.SelectedIndexChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_FilePatternCpm
+            // 
+            this.C_FilePatternCpm.Location = new System.Drawing.Point(158, 75);
+            this.C_FilePatternCpm.Name = "C_FilePatternCpm";
+            this.C_FilePatternCpm.Size = new System.Drawing.Size(99, 20);
+            this.C_FilePatternCpm.TabIndex = 18;
+            this.C_FilePatternCpm.Text = "Disk ***";
+            this.C_FilePatternCpm.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_SelectSavePathCpm
+            // 
+            this.C_SelectSavePathCpm.Location = new System.Drawing.Point(76, 75);
+            this.C_SelectSavePathCpm.Name = "C_SelectSavePathCpm";
+            this.C_SelectSavePathCpm.Size = new System.Drawing.Size(75, 23);
+            this.C_SelectSavePathCpm.TabIndex = 16;
+            this.C_SelectSavePathCpm.Text = "Select";
+            this.C_SelectSavePathCpm.UseVisualStyleBackColor = true;
+            this.C_SelectSavePathCpm.Click += new System.EventHandler(this.C_SelectSavePathCpm_Click);
+            // 
+            // C_FileTypeIsDos
+            // 
+            this.C_FileTypeIsDos.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_FileTypeIsDos.FormattingEnabled = true;
+            this.C_FileTypeIsDos.Items.AddRange(new object[] {
+            "FDI"});
+            this.C_FileTypeIsDos.Location = new System.Drawing.Point(265, 47);
+            this.C_FileTypeIsDos.Name = "C_FileTypeIsDos";
+            this.C_FileTypeIsDos.Size = new System.Drawing.Size(98, 21);
+            this.C_FileTypeIsDos.TabIndex = 13;
+            this.C_FileTypeIsDos.SelectedIndexChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_FilePatternIsDos
+            // 
+            this.C_FilePatternIsDos.Location = new System.Drawing.Point(158, 48);
+            this.C_FilePatternIsDos.Name = "C_FilePatternIsDos";
+            this.C_FilePatternIsDos.Size = new System.Drawing.Size(99, 20);
+            this.C_FilePatternIsDos.TabIndex = 11;
+            this.C_FilePatternIsDos.Text = "Disk ***";
+            this.C_FilePatternIsDos.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_SelectSavePathIsDos
+            // 
+            this.C_SelectSavePathIsDos.Location = new System.Drawing.Point(76, 48);
+            this.C_SelectSavePathIsDos.Name = "C_SelectSavePathIsDos";
+            this.C_SelectSavePathIsDos.Size = new System.Drawing.Size(75, 23);
+            this.C_SelectSavePathIsDos.TabIndex = 9;
+            this.C_SelectSavePathIsDos.Text = "Select";
+            this.C_SelectSavePathIsDos.UseVisualStyleBackColor = true;
+            this.C_SelectSavePathIsDos.Click += new System.EventHandler(this.C_SelectSavePathIsDos_Click);
+            // 
+            // C_FileTypeTrDos
+            // 
+            this.C_FileTypeTrDos.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_FileTypeTrDos.FormattingEnabled = true;
+            this.C_FileTypeTrDos.Items.AddRange(new object[] {
+            "FDI",
+            "TRD",
+            "Modified TRD"});
+            this.C_FileTypeTrDos.Location = new System.Drawing.Point(265, 20);
+            this.C_FileTypeTrDos.Name = "C_FileTypeTrDos";
+            this.C_FileTypeTrDos.Size = new System.Drawing.Size(98, 21);
+            this.C_FileTypeTrDos.TabIndex = 6;
+            this.C_FileTypeTrDos.SelectedIndexChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(262, 5);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(50, 13);
+            this.label5.TabIndex = 5;
+            this.label5.Text = "File Type";
+            // 
+            // C_FilePatternTrDos
+            // 
+            this.C_FilePatternTrDos.Location = new System.Drawing.Point(158, 22);
+            this.C_FilePatternTrDos.Name = "C_FilePatternTrDos";
+            this.C_FilePatternTrDos.Size = new System.Drawing.Size(99, 20);
+            this.C_FilePatternTrDos.TabIndex = 4;
+            this.C_FilePatternTrDos.Text = "Disk ***";
+            this.C_FilePatternTrDos.TextChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(155, 5);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(91, 13);
+            this.label4.TabIndex = 3;
+            this.label4.Text = "File Name Pattern";
+            // 
+            // C_SelectSavePathTrDos
+            // 
+            this.C_SelectSavePathTrDos.Location = new System.Drawing.Point(76, 21);
+            this.C_SelectSavePathTrDos.Name = "C_SelectSavePathTrDos";
+            this.C_SelectSavePathTrDos.Size = new System.Drawing.Size(75, 23);
+            this.C_SelectSavePathTrDos.TabIndex = 2;
+            this.C_SelectSavePathTrDos.Text = "Select";
+            this.C_SelectSavePathTrDos.UseVisualStyleBackColor = true;
+            this.C_SelectSavePathTrDos.Click += new System.EventHandler(this.C_SelectSavePathTrDos_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -477,6 +905,10 @@
             this.tabPage1.PerformLayout();
             this.tabPage2.ResumeLayout(false);
             this.tabPage2.PerformLayout();
+            this.tabPage6.ResumeLayout(false);
+            this.tabPage6.PerformLayout();
+            this.groupBox2.ResumeLayout(false);
+            this.groupBox2.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -519,6 +951,42 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Button C_LoadDiskFormat;
         private System.Windows.Forms.TabPage tabPage5;
+        private System.Windows.Forms.TabPage tabPage6;
+        private System.Windows.Forms.Button C_HtAbort;
+        private System.Windows.Forms.Button C_RepeatReading;
+        private System.Windows.Forms.Button C_NewDisk;
+        private System.Windows.Forms.ComboBox C_HtDataRate;
+        private System.Windows.Forms.Label label12;
+        private System.Windows.Forms.ComboBox C_FileTypeCpm;
+        private System.Windows.Forms.TextBox C_FilePatternCpm;
+        private System.Windows.Forms.Button C_SelectSavePathCpm;
+        private System.Windows.Forms.ComboBox C_FileTypeIsDos;
+        private System.Windows.Forms.TextBox C_FilePatternIsDos;
+        private System.Windows.Forms.Button C_SelectSavePathIsDos;
+        private System.Windows.Forms.ComboBox C_FileTypeTrDos;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.TextBox C_FilePatternTrDos;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.Button C_SelectSavePathTrDos;
+        private System.Windows.Forms.TextBox C_HtDefaultImageSize;
+        private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.TextBox C_HtMaxTracks;
+        private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.Button C_HtSave;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.TextBox C_HtSectorReadAttempts;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.TextBox C_HtTimeout;
+        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.TextBox C_HtStopOnNthFail;
+        private System.Windows.Forms.CheckBox C_HtCpmCheckBox;
+        private System.Windows.Forms.CheckBox C_HtIsDosCheckBox;
+        private System.Windows.Forms.CheckBox C_HtTrDosCheckBox;
+        private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.TextBox C_HtNumberOfReads;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.CheckBox C_HtRandomReadOn;
     }
 }
 

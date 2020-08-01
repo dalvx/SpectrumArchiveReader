@@ -11,18 +11,20 @@ namespace SpectrumArchiveReader
     {
         protected CpmImage CpmImage { get { return (CpmImage)Image; } }
 
-        public CpmReader(Control parent, DataRate defaultDataRate) : base(parent, 1024, 5, defaultDataRate)
+        public CpmReader(Control parent, DiskReaderParams dparams) : base(parent, 1024, 5, dparams)
         {
-            zeroLCL.Text = "Empty";
+            upperSidePanel.Visible = false;
+            readModePanel.Visible = false;
+            map.ZeroLCL.Text = "Empty";
             map.ZeroByte = 0xE5;
-            fileL.Visible = false;
-            fileLV.Visible = false;
-            extenstionLV.Visible = false;
+            map.FileL.Visible = false;
+            map.FileLV.Visible = false;
+            map.ExtenstionLV.Visible = false;
             readCatalogue.Visible = false;
             showCatalogue.Visible = false;
             showCatFromTrack.Visible = false;
-            stats.Headers[3] = "Размер KDI:";
             Image = new CpmImage(160 * SectorsOnTrack, map) { Name = "" };
+            map.Image = Image;
             stats.Image = Image;
             map.Repaint();
             stats.Repaint();
@@ -33,7 +35,6 @@ namespace SpectrumArchiveReader
             readForward.Click += ReadForward;
             readBackward.Click += ReadBackward;
             readRandomSectors.Click += ReadRandomSectors;
-            Params.ImageSectorLayout.SetFormat(TrackFormatName.CpmSequential);
         }
 
         protected override bool ReadParametersCustom()
@@ -58,6 +59,7 @@ namespace SpectrumArchiveReader
             newImageName = value;
             newImageSize = size;
             Image = new CpmImage(size * SectorsOnTrack, map) { Name = value };
+            map.Image = Image;
             stats.Image = Image;
             SetEnabled();
             Log.Info?.Out($"Образ диска создан. Имя: {value} | Размер: {size} треков ({size * SectorsOnTrack} секторов).");
@@ -75,7 +77,7 @@ namespace SpectrumArchiveReader
             }
             else
             {
-                File.WriteAllBytes(saveDialog.FileName, CpmImage.ToFdi(Params.ImageSectorLayout, null, 0));
+                File.WriteAllBytes(saveDialog.FileName, CpmImage.ToFdi(null, 0));
             }
             Image.ResetModify();
             Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");

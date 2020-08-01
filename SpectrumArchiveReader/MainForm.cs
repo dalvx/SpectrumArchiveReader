@@ -8,6 +8,8 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace SpectrumArchiveReader
 {
@@ -18,7 +20,6 @@ namespace SpectrumArchiveReader
         private const int MaxLinesH = 300;
         private MList<string> outputNormal = new MList<string>();
         public static CatalogueForm CatalogueForm;
-        private DataRate defaultDataRate = DataRate.FD_RATE_250K;
         private HelpForm helpForm;
         private MList<ReaderBase> readers = new MList<ReaderBase>();
         private bool removeFunctionNameFromLog = false;
@@ -26,9 +27,120 @@ namespace SpectrumArchiveReader
         private MList<TrackFormat> diskFormat;
         public static bool Dev;
 
+        private HtTabPars htTabPars;
+
+        public class HtTabPars
+        {
+            public DiskImage Image;
+            public ImageStatsTable StatsTable;
+            public Map Map;
+            public DiskReaderParams Params;
+            public int MaxTracks = 172;
+            public int NumberOfReads = 1;
+            public string TrDosDir = null;
+            public string CpmDir = null;
+            public string IsDosDir = null;
+            public FileType TrDosFileType = FileType.Fdi;
+            public FileType CpmFileType = FileType.Fdi;
+            public FileType IsDosFileType = FileType.Fdi;
+            public string TrDosFileName = "D***";
+            public string CpmFileName = "D***";
+            public string IsDosFileName = "D***";
+            public DataRate DataRate = DataRate.FD_RATE_250K;
+            public bool TrDosChecked = true;
+            public bool IsDosChecked = true;
+            public bool CpmChecked = true;
+            public int SectorReadAttempts = 1;
+            public int DefaultImageSizeInTracks = 160;
+            public bool Enabled = true;
+            public bool Processing;
+            public bool RandomReadTurnedOn;
+            public TimeSpan RandomReadTimeout;
+            public int RandomReadStopOnNthFail;
+            public bool ParametersChanging;
+            /// <summary>
+            /// Имя файла куда был сохранен образ. Является также признаком того что образ был сохранен. Если образ не был сохранен, то null.
+            /// </summary>
+            public string CurrentFileName;
+            public TrackFormat Track0Format = new TrackFormat(55);
+
+            public static FileType[] TrDosFileTypes = { FileType.Fdi, FileType.Trd, FileType.ModifiedTrd };
+            public static FileType[] IsDosFileTypes = { FileType.Fdi };
+            public static FileType[] CpmFileTypes = { FileType.Fdi, FileType.Kdi };
+
+            public static int GetFileTypeIndex(FileType fileType, FileType[] array)
+            {
+                for (int i = 0; i < array.Length; i++)
+                {
+                    if (array[i] == fileType) return i;
+                }
+                throw new Exception();
+            }
+
+            public static int GetDataRateIndex(DataRate dataRate, DataRate[] array)
+            {
+                for (int i = 0; i < array.Length; i++)
+                {
+                    if (array[i] == dataRate) return i;
+                }
+                throw new Exception();
+            }
+
+            public void WriteToXml(XmlTextWriter xml, string name)
+            {
+                xml.WriteStartElement(name);
+                xml.WriteAttributeString("MaxTracks", MaxTracks.ToString());
+                xml.WriteAttributeString("NumberOfReads", NumberOfReads.ToString());
+                xml.WriteAttributeString("TrDosDir", TrDosDir);
+                xml.WriteAttributeString("IsDosDir", IsDosDir);
+                xml.WriteAttributeString("CpmDir", CpmDir);
+                xml.WriteAttributeString("TrDosFileType", TrDosFileType.ToString());
+                xml.WriteAttributeString("CpmFileType", CpmFileType.ToString());
+                xml.WriteAttributeString("IsDosFileType", IsDosFileType.ToString());
+                xml.WriteAttributeString("TrDosFileName", TrDosFileName);
+                xml.WriteAttributeString("CpmFileName", CpmFileName);
+                xml.WriteAttributeString("IsDosFileName", IsDosFileName);
+                xml.WriteAttributeString("DataRate", DataRate.ToString());
+                xml.WriteAttributeString("TrDosChecked", TrDosChecked.ToString());
+                xml.WriteAttributeString("IsDosChecked", IsDosChecked.ToString());
+                xml.WriteAttributeString("CpmChecked", CpmChecked.ToString());
+                xml.WriteAttributeString("SectorReadAttempts", SectorReadAttempts.ToString());
+                xml.WriteAttributeString("DefaultImageSizeInTracks", DefaultImageSizeInTracks.ToString());
+                xml.WriteAttributeString("RandomReadTurnedOn", RandomReadTurnedOn.ToString());
+                xml.WriteAttributeString("RandomReadTimeout", RandomReadTimeout.ToString());
+                xml.WriteAttributeString("RandomReadStopOnNthFail", RandomReadStopOnNthFail.ToString());
+                xml.WriteEndElement();
+            }
+
+            public void ReadFromXml(XmlTextReader xml)
+            {
+                MaxTracks = int.Parse(xml.GetAttribute("MaxTracks"));
+                NumberOfReads = int.Parse(xml.GetAttribute("NumberOfReads"));
+                TrDosDir = xml.GetAttribute("TrDosDir");
+                IsDosDir = xml.GetAttribute("IsDosDir");
+                CpmDir = xml.GetAttribute("CpmDir");
+                TrDosFileType = (FileType)Enum.Parse(typeof(FileType), xml.GetAttribute("TrDosFileType"));
+                CpmFileType = (FileType)Enum.Parse(typeof(FileType), xml.GetAttribute("CpmFileType"));
+                IsDosFileType = (FileType)Enum.Parse(typeof(FileType), xml.GetAttribute("IsDosFileType"));
+                TrDosFileName = xml.GetAttribute("TrDosFileName");
+                CpmFileName = xml.GetAttribute("CpmFileName");
+                IsDosFileName = xml.GetAttribute("IsDosFileName");
+                DataRate = (DataRate)Enum.Parse(typeof(DataRate), xml.GetAttribute("DataRate"));
+                TrDosChecked = bool.Parse(xml.GetAttribute("TrDosChecked"));
+                IsDosChecked = bool.Parse(xml.GetAttribute("IsDosChecked"));
+                CpmChecked = bool.Parse(xml.GetAttribute("CpmChecked"));
+                SectorReadAttempts = int.Parse(xml.GetAttribute("SectorReadAttempts"));
+                DefaultImageSizeInTracks = int.Parse(xml.GetAttribute("DefaultImageSizeInTracks"));
+                RandomReadTurnedOn = bool.Parse(xml.GetAttribute("RandomReadTurnedOn"));
+                RandomReadTimeout = TimeSpan.Parse(xml.GetAttribute("RandomReadTimeout"));
+                RandomReadStopOnNthFail = int.Parse(xml.GetAttribute("RandomReadStopOnNthFail"));
+            }
+        }
+
         public MainForm()
         {
             InitializeComponent();
+
             string[] args = Environment.GetCommandLineArgs();
             string dev = GetKeyStartingWith(args, "/dev");
             Dev = dev != null;
@@ -37,15 +149,6 @@ namespace SpectrumArchiveReader
                 tabControl1.Controls.RemoveAt(1);
                 removeFunctionNameFromLog = true;
             }
-            readers.Add(new TrDosReader(tabPage3, defaultDataRate));
-            readers.Add(new CpmReader(tabPage4, defaultDataRate));
-            readers.Add(new IsDosReader(tabPage5, defaultDataRate));
-            for (int i = 0; i < readers.Cnt; i++)
-            {
-                readers[i].OperationStarted += MainForm_OperationStarted;
-                readers[i].OperationCompleted += MainForm_OperationCompleted;
-            }
-            tabControl1.SelectedIndex = 1;
             Log.MsgType fileAllowedMessages = 0;
             Log.MsgType windowAllowedMessages = Log.MsgType.Info | Log.MsgType.Warn | Log.MsgType.Error | Log.MsgType.Fatal;
             string logfileKey = GetKeyStartingWith(args, "/logfile");
@@ -53,34 +156,99 @@ namespace SpectrumArchiveReader
             string logWindowKey = GetKeyStartingWith(args, "/logwin");
             if (logWindowKey != null) windowAllowedMessages = GetLogMsgTypeFromKey(logWindowKey);
 
-            if (ContainsKey(args, "/250K"))
-            {
-                defaultDataRate = DataRate.FD_RATE_250K;
-            }
-            else if (ContainsKey(args, "/300K"))
-            {
-                defaultDataRate = DataRate.FD_RATE_300K;
-            }
-            else if (ContainsKey(args, "/500K"))
-            {
-                defaultDataRate = DataRate.FD_RATE_500K;
-            }
-            else if (ContainsKey(args, "/1M"))
-            {
-                defaultDataRate = DataRate.FD_RATE_1M;
-            }
             if (!Log.Init(fileAllowedMessages != 0, fileAllowedMessages != 0, windowAllowedMessages != 0, outputNormal, null, fileAllowedMessages, windowAllowedMessages))
             {
                 MessageBox.Show("Cannot create a log directory");
                 Application.Exit();
                 return;
             }
+
+            C_UIRefreshPeriod.SelectedIndex = 2;
+
+            DiskReaderParams cpmParams = new DiskReaderParams()
+            {
+                DataRate = DataRate.FD_RATE_250K,
+                SectorReadAttempts = 1,
+                Side = DiskSide.Both,
+                UpperSideHead = UpperSideHead.Head1,
+                TrackTo = 172
+            };
+            DiskReaderParams trDosParams = (DiskReaderParams)cpmParams.Clone();
+            trDosParams.TrackLayoutAutodetect = true;
+            trDosParams.ReadMode = ReadMode.Fast;
+            trDosParams.UpperSideHeadAutodetect = true;
+            DiskReaderParams isDosParams = (DiskReaderParams)cpmParams.Clone();
+
+            htTabPars = new HtTabPars();
+            htTabPars.StatsTable = new ImageStatsTable(tabPage6, SystemColors.Window, SystemColors.ControlText);
+            htTabPars.StatsTable.SetPosition(tabPage6.Width - 290, 16);
+            htTabPars.StatsTable.Repaint();
+            htTabPars.Map = new Map(MaxTrack, 1024, 5, tabPage6, Color.White, htTabPars.StatsTable) { CanEditReadBounds = false };
+            htTabPars.Map.SetPosition(0, 227);
+            htTabPars.Map.TrackFrom = 0;
+            htTabPars.Map.TrackTo = MaxTrack;
+            htTabPars.Map.Repaint();
+
+            try
+            {
+                string settingsFile = Path.ChangeExtension(Application.ExecutablePath, ".xml");
+                if (File.Exists(settingsFile))
+                {
+                    using (XmlTextReader xml = new XmlTextReader(settingsFile))
+                    {
+                        while (xml.Read())
+                        {
+                            if (xml.NodeType != XmlNodeType.Element) continue;
+                            switch (xml.Name)
+                            {
+                                case "General":
+                                    tabControl1.SelectedIndex = int.Parse(xml.GetAttribute("TabIndex"));
+                                    C_UIRefreshPeriod.SelectedIndex = int.Parse(xml.GetAttribute("UIRefreshPeriod"));
+                                    break;
+
+                                case "TR-DOS":
+                                    trDosParams.ReadFromXml(xml);
+                                    break;
+
+                                case "CPM":
+                                    cpmParams.ReadFromXml(xml);
+                                    break;
+
+                                case "IS-DOS":
+                                    isDosParams.ReadFromXml(xml);
+                                    break;
+
+                                case "HT":
+                                    htTabPars.ReadFromXml(xml);
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                Log.Info?.Out($"Ошибка при загрузке настроек.");
+            }
+
+            readers.Add(new TrDosReader(tabPage3, trDosParams));
+            readers.Add(new CpmReader(tabPage4, cpmParams));
+            readers.Add(new IsDosReader(tabPage5, isDosParams));
+            for (int i = 0; i < readers.Cnt; i++)
+            {
+                readers[i].OperationStarted += MainForm_OperationStarted;
+                readers[i].OperationCompleted += MainForm_OperationCompleted;
+            }
+            tabControl1.SelectedIndex = 1;
+
             if (!Timer.IsHighResolution)
             {
                 Log.Trace?.Out("Таймер высокого разрешения недоступен.");
             }
             Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
-            C_UIRefreshPeriod.SelectedIndex = 2;
+
+            HtFillParameters();
+            HtSetEnabled(HtReadParameters());
         }
 
         private void MainForm_OperationCompleted(object sender, EventArgs e)
@@ -91,6 +259,8 @@ namespace SpectrumArchiveReader
             {
                 readers[i].Enabled = true;
             }
+            htTabPars.Enabled = true;
+            HtSetEnabled(true);
         }
 
         private void MainForm_OperationStarted(object sender, EventArgs e)
@@ -101,6 +271,8 @@ namespace SpectrumArchiveReader
             {
                 if (readers[i] != sender) readers[i].Enabled = false;
             }
+            if (sender != htTabPars) htTabPars.Enabled = false;
+            HtSetEnabled(true);
         }
 
         private bool ContainsKey(string[] args, string key)
@@ -187,7 +359,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                disk.LoadAutodetect(files[i]);
                 disk.ParseCatalogue();
                 sb.Append(disk.ToHtmlTableAsFileList("		"));
             }
@@ -242,26 +414,30 @@ namespace SpectrumArchiveReader
             {
                 readers[i].RefreshControls();
             }
+            HtRefreshControls();
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            bool imageModified = false;
             for (int i = 0; i < readers.Cnt; i++)
             {
                 readers[i].Abort();
-                imageModified |= readers[i].Image.Modified;
             }
-            if (imageModified && e.CloseReason == CloseReason.UserClosing)
+            using (XmlTextWriter xml = new XmlTextWriter(Path.ChangeExtension(Application.ExecutablePath, ".xml"), new UTF8Encoding()))
             {
-                if (MessageBox.Show("Образ не был сохранен. Продолжить закрытие приложения?", "", MessageBoxButtons.YesNo) != DialogResult.Yes)
-                {
-                    e.Cancel = true;
-                }
-            }
-            else
-            {
-                e.Cancel = false;
+                xml.Formatting = Formatting.Indented;
+                xml.WriteStartDocument();
+                xml.WriteStartElement("Root");
+                xml.WriteStartElement("General");
+                xml.WriteAttributeString("TabIndex", tabControl1.SelectedIndex.ToString());
+                xml.WriteAttributeString("UIRefreshPeriod", C_UIRefreshPeriod.SelectedIndex.ToString());
+                xml.WriteEndElement();
+                readers[0].Params.SaveToXml(xml, "TR-DOS");
+                readers[1].Params.SaveToXml(xml, "CPM");
+                readers[2].Params.SaveToXml(xml, "IS-DOS");
+                htTabPars.WriteToXml(xml, "HT");
+                xml.WriteEndElement();
+                xml.WriteEndDocument();
             }
         }
 
@@ -298,7 +474,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly;
                 string cat;
@@ -412,7 +588,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
@@ -547,8 +723,410 @@ namespace SpectrumArchiveReader
             File.WriteAllText(saveDialog.FileName, sb.ToString());
         }
 
+        private byte[] GetMfmSyncArray(byte[] data)
+        {
+            byte[] r = new byte[data.Length];
+            int prevValue = 0;
+            for (int i = 0; i < r.Length; i++)
+            {
+                int mask = 1;
+                int b = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int valuei = (data[i] & (mask << m)) == 0 ? 0 : 1;
+                    if (valuei == 0 && prevValue == 0) b |= mask << m;
+                }
+                r[i] = (byte)b;
+            }
+            return r;
+        }
+
+        private byte[] GetMfmSyncArray1(byte[] data)
+        {
+            byte[] r = new byte[data.Length];
+            int prevValue = 0;
+            for (int i = 0; i < r.Length; i++)
+            {
+                int mask = 128;
+                int b = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int valuei = (data[i] & (mask >> m)) == 0 ? 0 : 1;
+                    if (valuei == 0 && prevValue == 0) b |= mask << m;
+                }
+                r[i] = (byte)b;
+            }
+            return r;
+        }
+
         private void Test_Click(object sender, EventArgs e)
-        {   
+        {
+            using (XmlTextWriter xml = new XmlTextWriter(Path.ChangeExtension(Application.ExecutablePath, ".xml"), new UTF8Encoding()))
+            {
+                xml.Formatting = Formatting.Indented;
+                xml.WriteStartDocument();
+                xml.WriteStartElement("General");
+                xml.WriteStartElement("HT");
+                xml.WriteAttributeString("localname", "value");
+                xml.WriteEndElement();
+                xml.WriteEndElement();
+                xml.WriteEndDocument();
+            }
+            return;
+
+            OpenFileDialog openDialog = new OpenFileDialog();
+            if (openDialog.ShowDialog() != DialogResult.OK) return;
+            TrDosImage image = new TrDosImage();
+            int result = image.LoadAutodetect(openDialog.FileName);
+            int attemptCount = 50;
+            //int track = 65;
+            //int sector = 11;
+
+            // D028:
+            int track = 121;
+            int sector = 15;
+
+            //int sectorNum = track * 16 + sector - 931;  // for D009 DISAB-17.
+            int sectorNum = track * 16 + sector;
+            int adr = sectorNum * 256;
+            DataRate dataRate = DataRate.FD_RATE_250K;
+            IntPtr driverHandle = Driver.Open(dataRate);
+            Driver.Seek(driverHandle, track);
+            IntPtr memoryHandle = Driver.VirtualAlloc(256);
+            int[] stats = new int[256 * 8];
+            MList<byte[]> blocks = new MList<byte[]>();
+            byte[] array = new byte[256];
+            byte[] array1 = new byte[256];
+            byte[] original = new byte[256];
+            Array.Copy(image.Data, adr, original, 0, 256);
+            int si;
+            int error23Cnt = 0;
+            int mismatchCntr;
+            int mismatchBitCntr;
+            for (int i = 0; i < attemptCount; i++)
+            {
+                int error = Driver.ReadSector(driverHandle, memoryHandle, track, sector + 1, UpperSideHead.Head0, 1);
+                Application.DoEvents();
+                if (error == 0)
+                {
+                    Log.Info?.Out($"Сектор прочитался успешно. Попытка: {i}");
+                    continue;
+                }
+                if (error != 23)
+                {
+                    Log.Info?.Out($"Ошибка не 23: {error}");
+                    continue;
+                }
+                Marshal.Copy(memoryHandle, array, 0, 256);
+                mismatchCntr = 0;
+                mismatchBitCntr = 0;
+                for (int t = 0; t < 256; t++)
+                {
+                    if (image.Data[adr + t] != array[t])
+                    {
+                        mismatchCntr++;
+                        int mask = 1;
+                        for (int m = 0; m < 8; m++)
+                        {
+                            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+                        }
+                    }
+                }
+                Log.Info?.Out($"Попытка: {i}. Error: {error}. Mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+                byte[] newarray = new byte[256];
+                array.CopyTo(newarray, 0);
+                blocks.Add(newarray);
+                error23Cnt++;
+                //si = 0;
+                //for (int c = 0; c < 256; c++)
+                //{
+                //    int mask = 1;
+                //    for (int m = 0; m < 8; m++)
+                //    {
+                //        if ((array[c] & (mask << m)) != 0) stats[si]++;
+                //        si++;
+                //    }
+                //}
+            }
+            Log.Info?.Out($"error23cnt: {error23Cnt}");
+
+            if (error23Cnt == 0)
+            {
+                Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+                Driver.Close(driverHandle);
+                return;
+            }
+            MList<byte[]> cluster1 = new MList<byte[]>();
+            MList<byte[]> cluster2 = new MList<byte[]>();
+            cluster1.Add(blocks[0]);
+            for (int i = 1; i < blocks.Cnt; i++)
+            {
+                mismatchCntr = 0;
+                for (int t = 0; t < 256; t++)
+                {
+                    if (blocks[i][t] != blocks[0][t]) mismatchCntr++;
+                }
+                if (mismatchCntr < 50)
+                {
+                    cluster1.Add(blocks[i]);
+                }
+                else
+                {
+                    cluster2.Add(blocks[i]);
+                }
+            }
+            Log.Info?.Out($"Cluster1: {cluster1.Cnt}. Cluster2: {cluster2.Cnt}");
+
+            // cluster1
+
+            for (int i = 0; i < cluster1.Cnt; i++)
+            {
+                si = 0;
+                for (int c = 0; c < 256; c++)
+                {
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((cluster1[i][c] & (mask << m)) != 0) stats[si]++;
+                        si++;
+                    }
+                }
+            }
+            si = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                byte resByte = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
+                    resByte |= (byte)(value << m);
+                    si++;
+                }
+                array[i] = resByte;
+            }
+            mismatchCntr = 0;
+            mismatchBitCntr = 0;
+            for (int t = 0; t < 256; t++)
+            {
+                if (image.Data[adr + t] != array[t])
+                {
+                    mismatchCntr++;
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+                    }
+                }
+                array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            }
+            Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+
+            // cluster2
+
+            Array.Clear(stats, 0, stats.Length);
+            for (int i = 0; i < cluster2.Cnt; i++)
+            {
+                si = 0;
+                for (int c = 0; c < 256; c++)
+                {
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((cluster2[i][c] & (mask << m)) != 0) stats[si]++;
+                        si++;
+                    }
+                }
+            }
+            si = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                byte resByte = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
+                    resByte |= (byte)(value << m);
+                    si++;
+                }
+                array[i] = resByte;
+            }
+            mismatchCntr = 0;
+            mismatchBitCntr = 0;
+            for (int t = 0; t < 256; t++)
+            {
+                if (image.Data[adr + t] != array[t])
+                {
+                    mismatchCntr++;
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+                    }
+                }
+                array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            }
+            Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+
+            // cluster1 MFM-sync
+
+            Array.Clear(stats, 0, stats.Length);
+            for (int i = 0; i < cluster1.Cnt; i++)
+            {
+                si = 0;
+                byte[] mfmSync = GetMfmSyncArray(cluster1[i]);
+                for (int c = 0; c < 256; c++)
+                {
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
+                        si++;
+                    }
+                }
+            }
+            si = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                byte resByte = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
+                    resByte |= (byte)(value << m);
+                    si++;
+                }
+                array[i] = resByte;
+            }
+            mismatchCntr = 0;
+            mismatchBitCntr = 0;
+            for (int t = 0; t < 256; t++)
+            {
+                if (image.Data[adr + t] != array[t])
+                {
+                    mismatchCntr++;
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+                    }
+                }
+                array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            }
+            Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+
+            // cluster2 MFM-Sync
+
+            Array.Clear(stats, 0, stats.Length);
+            for (int i = 0; i < cluster2.Cnt; i++)
+            {
+                si = 0;
+                byte[] mfmSync = GetMfmSyncArray(cluster2[i]);
+                for (int c = 0; c < 256; c++)
+                {
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
+                        si++;
+                    }
+                }
+            }
+            si = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                byte resByte = 0;
+                for (int m = 0; m < 8; m++)
+                {
+                    int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
+                    resByte |= (byte)(value << m);
+                    si++;
+                }
+                array[i] = resByte;
+            }
+            mismatchCntr = 0;
+            mismatchBitCntr = 0;
+            for (int t = 0; t < 256; t++)
+            {
+                if (image.Data[adr + t] != array[t])
+                {
+                    mismatchCntr++;
+                    int mask = 1;
+                    for (int m = 0; m < 8; m++)
+                    {
+                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+                    }
+                }
+                array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            }
+            Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+
+            //si = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    byte resByte = 0;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int value = stats[si] > error23Cnt / 2 ? 1 : 0;
+            //        resByte |= (byte)(value << m);
+            //        si++;
+            //    }
+            //    array[i] = resByte;
+            //}
+            //mismatchCntr = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    if (image.Data[adr + i] != array[i]) mismatchCntr++;
+            //}
+            //Log.Info?.Out($"Несовпадающие байты: {mismatchCntr}");
+            Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+            Driver.Close(driverHandle);
+            return;
+
+            //OpenFileDialog openDialog = new OpenFileDialog();
+            //if (openDialog.ShowDialog() != DialogResult.OK) return;
+            //TrDosImage image = new TrDosImage();
+            //int result = image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential));
+            //int track = 121;
+            //int sector = 15;
+            //int sectorNum = 121 * 16 + 15;
+            //byte[] array = new byte[256];
+            //Array.Copy(image.Data, sectorNum * 256, array, 0, 256);
+            //StringBuilder sb = new StringBuilder(array.Length * 8 * 2);
+            //int prevValue = 0;
+            //for (int i = 0, j = 1, c = 0; j < array.Length; i++, j++)
+            //{
+            //    int mask = 1;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int valuei = (array[i] & (mask << m)) == 0 ? 0 : 1;
+            //        int valuej = (array[j] & (mask << m)) == 0 ? 0 : 1;
+            //        sb.Append(valuei == 0 && prevValue == 0 ? '+' : '-');
+            //        sb.Append(valuei == 0 ? '0' : '1');
+            //        prevValue = valuei;
+            //    }
+            //}
+            //Clipboard.SetText(sb.ToString());
+            //return;
+
+            //DataRate dataRate = DataRate.FD_RATE_250K;
+            //IntPtr driverHandle = Driver.Open(dataRate);
+            //int track = 0;
+            //Driver.Seek(driverHandle, track);
+            //IntPtr memoryHandle = Driver.VirtualAlloc(8192);
+            //int error = Driver.ReadSector(driverHandle, memoryHandle, 0, 9, UpperSideHead.Head0, 1);
+            //Log.Info?.Out($"Error: {error}");
+            //byte[] dest = new byte[8192];
+            //Marshal.Copy(memoryHandle, dest, 0, 8192);
+            //for (int i = 0; i < dest.Length; i++)
+            //{
+            //    if (dest[i] != 0)
+            //    {
+            //        Log.Info?.Out($"Данные не нулевые.");
+            //        break;
+            //    }
+            //}
+            //Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+            //Driver.Close(driverHandle);
+            //return;
+
             //DataRate dataRate = DataRate.FD_RATE_250K;
             //IntPtr driverHandle = Driver.Open(dataRate);
             //int track = 83;
@@ -594,21 +1172,21 @@ namespace SpectrumArchiveReader
             //return;
 
 
-            DataRate dataRate = DataRate.FD_RATE_250K;
-            IntPtr driverHandle = Driver.Open(dataRate);
-            Log.Info?.Out($"result: {Driver.Seek(driverHandle, 171)}");
-            int track = 10;
-            Driver.Seek(driverHandle, track);
-            tagFD_READ_ID_PARAMS pars = new tagFD_READ_ID_PARAMS()
-            {
-                flags = Driver.FD_OPTION_MFM,
-                head = (byte)(track & 1)
-            };
-            tagFD_CMD_RESULT cmdResult = new tagFD_CMD_RESULT();
-            Driver.ReadId(driverHandle, pars, out cmdResult);
-            Log.Info?.Out($"result: {cmdResult.cyl}");
-            Driver.Close(driverHandle);
-            return;
+            //DataRate dataRate = DataRate.FD_RATE_250K;
+            //IntPtr driverHandle = Driver.Open(dataRate);
+            //Log.Info?.Out($"result: {Driver.Seek(driverHandle, 171)}");
+            //int track = 10;
+            //Driver.Seek(driverHandle, track);
+            //tagFD_READ_ID_PARAMS pars = new tagFD_READ_ID_PARAMS()
+            //{
+            //    flags = Driver.FD_OPTION_MFM,
+            //    head = (byte)(track & 1)
+            //};
+            //tagFD_CMD_RESULT cmdResult = new tagFD_CMD_RESULT();
+            //Driver.ReadId(driverHandle, pars, out cmdResult);
+            //Log.Info?.Out($"result: {cmdResult.cyl}");
+            //Driver.Close(driverHandle);
+            //return;
 
 
             //DataRate dataRate = DataRate.FD_RATE_250K;
@@ -1076,7 +1654,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                disk.LoadAutodetect(files[i]);
                 disk.ParseCatalogue();
                 for (int j = 0; j < values.Length; j++)
                 {
@@ -1134,7 +1712,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage disk = new TrDosImage();
-                disk.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                disk.LoadAutodetect(files[i]);
                 disk.ParseCatalogue();
                 for (int j = 0; j < bytes.Length; j++)
                 {
@@ -1173,10 +1751,10 @@ namespace SpectrumArchiveReader
             OpenFileDialog openDialog = new OpenFileDialog() { Filter = "TRD Files (*.trd)|*.trd|All Files (*.*)|*.*" };
             if (openDialog.ShowDialog() != DialogResult.OK) return;
             TrDosImage image = new TrDosImage();
-            image.LoadAutodetect(openDialog.FileName, new TrackFormat(TrackFormatName.TrDosSequential));
+            image.LoadAutodetect(openDialog.FileName);
             SaveFileDialog saveDialog = new SaveFileDialog();
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
-            File.WriteAllBytes(saveDialog.FileName, image.ToTrd(32));
+            File.WriteAllBytes(saveDialog.FileName, image.ToTrd(32, false));
         }
 
         private void BuildDuplicateMaps_Click(object sender, EventArgs e)
@@ -1195,7 +1773,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
@@ -1233,7 +1811,7 @@ namespace SpectrumArchiveReader
             for (int i = 0; i < files.Length; i++)
             {
                 TrDosImage image = new TrDosImage();
-                image.LoadAutodetect(files[i], new TrackFormat(TrackFormatName.TrDosSequential));
+                image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
                 values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
@@ -1507,6 +2085,444 @@ namespace SpectrumArchiveReader
         private void C_Abort_Click(object sender, EventArgs e)
         {
             if (diskReader != null) diskReader.Aborted = true;
+        }
+
+        private string GetPattern(string fileName, out int numLen)
+        {
+            int index = fileName.IndexOf('*');
+            numLen = 0;
+            if (index < 0) return fileName + "[0-9]+$";
+            int i;
+            for (i = index + 1; i < fileName.Length; i++)
+            {
+                if (fileName[i] != '*') break;
+            }
+            numLen = i - index;
+            return "^" + fileName.Remove(index, numLen).Insert(index, "[0-9]+").Replace("*", "") + "$";
+        }
+
+        private void C_NewDisk_Click(object sender, EventArgs e)
+        {
+            if (!HtReadParameters())
+            {
+                MessageBox.Show("Ошибка в параметрах.");
+                return;
+            }
+            htTabPars.Processing = true;
+            MainForm_OperationStarted(htTabPars, e);
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
+            {
+                try
+                {
+                    htTabPars.Image = null;
+                    htTabPars.Map.Image = null;
+                    htTabPars.StatsTable.Image = null;
+                    htTabPars.Params = new DiskReaderParams()
+                    {
+                        DataRate = htTabPars.DataRate,
+                        SectorNumFrom = 0,
+                        SectorReadAttempts = htTabPars.SectorReadAttempts,
+                        Side = DiskSide.Both,
+                        TrackFrom = 0,
+                        TrackTo = htTabPars.MaxTracks,
+                        UpperSideHead = UpperSideHead.Head1
+                    };
+
+                    diskReader = new DiskReader(htTabPars.Params);
+                    diskReader.OpenDriver();
+                    bool formatIdentified = false;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        Driver.Recalibrate(diskReader.DriverHandle);
+                        bool scanResult = diskReader.ScanFormat(htTabPars.Track0Format, 0, true);
+                        if (diskReader.Aborted) goto abort;
+                        Log.Info?.Out($"Формат 0 трека: {htTabPars.Track0Format.FormatName} | {htTabPars.Track0Format.Layout.Cnt} sectors | {htTabPars.Track0Format.ToStringAsSectorArray()}");
+                        if (htTabPars.Track0Format.DoesSatisfyFormat(TrackFormat.TrDos, 0))
+                        {
+                            if (htTabPars.TrDosChecked)
+                            {
+                                htTabPars.Map.ChangeSize(256, 16);
+                                htTabPars.Image = new TrDosImage(htTabPars.DefaultImageSizeInTracks * 16, htTabPars.Map);
+                                Log.Info?.Out($"Reading as TR-DOS.");
+                            }
+                            else
+                            {
+                                Log.Info?.Out($"Detected as TR-DOS.");
+                                goto abort;
+                            }
+                        }
+                        else if (htTabPars.Track0Format.FormatName >= TrackFormatName.CpmSequential && htTabPars.Track0Format.FormatName <= TrackFormatName.CpmGeneric)
+                        {
+                            if (htTabPars.CpmChecked)
+                            {
+                                htTabPars.Map.ChangeSize(1024, 5);
+                                htTabPars.Image = new CpmImage(htTabPars.DefaultImageSizeInTracks * 5, htTabPars.Map);
+                                Log.Info?.Out($"Reading as CP/M.");
+                            }
+                            else
+                            {
+                                Log.Info?.Out($"Detected as CP/M.");
+                                goto abort;
+                            }
+                        }
+                        else if (htTabPars.Track0Format.FormatName >= TrackFormatName.IsDosSequential && htTabPars.Track0Format.FormatName <= TrackFormatName.IsDosGeneric)
+                        {
+                            if (htTabPars.IsDosChecked)
+                            {
+                                htTabPars.Map.ChangeSize(1024, 5);
+                                htTabPars.Image = new IsDosImage(htTabPars.DefaultImageSizeInTracks * 5, htTabPars.Map);
+                                Log.Info?.Out($"Reading as IS-DOS.");
+                            }
+                            else
+                            {
+                                Log.Info?.Out($"Detected as IS-DOS.");
+                                goto abort;
+                            }
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                        formatIdentified = true;
+                        break;
+                    }
+                    if (htTabPars.Track0Format.Layout.Cnt == 0)
+                    {
+                        Log.Info?.Out($"На нулевом треке заголовки секторов не обнаружены.");
+                        goto abort;
+                    }
+                    else if (!formatIdentified)
+                    {
+                        Log.Info?.Out($"Формат не поддерживается или диск имеет ошибки на нулевом треке.");
+                        goto abort;
+                    }
+                    htTabPars.Map.Image = htTabPars.Image;
+                    htTabPars.StatsTable.Image = htTabPars.Image;
+                    htTabPars.Params.ReadMode = htTabPars.Image is TrDosImage && Timer.IsHighResolution ? ReadMode.Fast : ReadMode.Standard;
+                    htTabPars.Params.TrackLayoutAutodetect = htTabPars.Image is TrDosImage;
+                    htTabPars.Params.UpperSideHeadAutodetect = htTabPars.Image is TrDosImage;
+                    htTabPars.CurrentFileName = null;
+                    htTabPars.StatsTable.Image = htTabPars.Image;
+                    htTabPars.Params.Image = htTabPars.Image;
+                    HtRead(false);
+                    if (!diskReader.Aborted) HtSave();
+                    return;
+                    abort:
+                    diskReader.CloseDriver();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error?.Out($"Исключение: {ex.Message} | StackTrace: {ex.StackTrace}");
+                }
+            };
+            worker.RunWorkerCompleted += (object sender1, RunWorkerCompletedEventArgs ee) =>
+            {
+                htTabPars.Processing = false;
+                MainForm_OperationCompleted(sender, e);
+            };
+            worker.RunWorkerAsync();
+        }
+
+        private void C_RepeatReading_Click(object sender, EventArgs e)
+        {
+            if(!HtReadParameters())
+            {
+                MessageBox.Show("Ошибка в параметрах.");
+                return;
+            }
+            htTabPars.Processing = true;
+            MainForm_OperationStarted(htTabPars, e);
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
+            {
+                try
+                {
+                    htTabPars.Params.DataRate = htTabPars.DataRate;
+                    htTabPars.Params.SectorReadAttempts = htTabPars.SectorReadAttempts;
+                    htTabPars.Params.TrackTo = htTabPars.MaxTracks;
+                    HtRead(true);
+                    if(!diskReader.Aborted) HtSave();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error?.Out($"Исключение: {ex.Message} | StackTrace: {ex.StackTrace}");
+                }
+            };
+            worker.RunWorkerCompleted += (object sender1, RunWorkerCompletedEventArgs ee) =>
+            {
+                htTabPars.Processing = false;
+                MainForm_OperationCompleted(sender, e);
+            };
+            worker.RunWorkerAsync();
+        }
+
+        private void C_HtSave_Click(object sender, EventArgs e)
+        {
+            HtSave();
+        }
+
+        private void HtRead(bool newDiskReader)
+        {
+            if (newDiskReader)
+            {
+                htTabPars.Params = new DiskReaderParams()
+                {
+                    Image = htTabPars.Image,
+                    DataRate = htTabPars.DataRate,
+                    SectorNumFrom = 0,
+                    SectorReadAttempts = htTabPars.SectorReadAttempts,
+                    Side = DiskSide.Both,
+                    TrackFrom = 0,
+                    TrackTo = htTabPars.MaxTracks,
+                    UpperSideHead = UpperSideHead.Head1,
+                    TrackLayoutAutodetect = htTabPars.Image is TrDosImage
+                };
+
+                htTabPars.Params.UpperSideHeadAutodetect = htTabPars.Image is TrDosImage;
+                diskReader = new DiskReader(htTabPars.Params);
+                diskReader.OpenDriver();
+            }
+            diskReader.Params.SectorNumTo = Math.Min(htTabPars.Image.SizeSectors, htTabPars.MaxTracks * htTabPars.Image.StandardFormat.Layout.Cnt);
+            diskReader.Params.CurrentTrackFormat = htTabPars.Track0Format;
+            for (int readCntr = 0; readCntr < htTabPars.NumberOfReads; readCntr++)
+            {
+                diskReader.ReadForward();
+                if (diskReader.Aborted) goto end;
+                if (readCntr == 0)
+                {
+                    diskReader.DetectDiskSize(htTabPars.MaxTracks);
+                    if (diskReader.Aborted) goto end;
+                }
+                readCntr++;
+                if (readCntr >= htTabPars.NumberOfReads || htTabPars.Image.BadSectors == 0) break;
+                diskReader.ReadBackward();
+                if (diskReader.Aborted) goto end;
+                if (htTabPars.Image.BadSectors == 0) break;
+            }
+            if (htTabPars.RandomReadTurnedOn && htTabPars.Image.BadSectors > 0)
+            {
+                diskReader.ReadRandomSectors(htTabPars.RandomReadTimeout, htTabPars.RandomReadStopOnNthFail);
+                if (diskReader.Aborted) goto end;
+            }
+            end:
+            diskReader.CloseDriver();            
+        }
+
+        private void HtSave()
+        {
+            string savePath = null;
+            FileType fileType = FileType.Fdi;
+            string fileName = null;
+            if (htTabPars.Image is TrDosImage)
+            {
+                savePath = htTabPars.TrDosDir;
+                fileType = htTabPars.TrDosFileType;
+                fileName = htTabPars.TrDosFileName;
+            }
+            else if (htTabPars.Image is IsDosImage)
+            {
+                savePath = htTabPars.IsDosDir;
+                fileType = htTabPars.IsDosFileType;
+                fileName = htTabPars.IsDosFileName;
+            }
+            else if (htTabPars.Image is CpmImage)
+            {
+                savePath = htTabPars.CpmDir;
+                fileType = htTabPars.CpmFileType;
+                fileName = htTabPars.CpmFileName;
+            }
+            else
+            {
+                throw new Exception();
+            }
+            if (!Directory.Exists(savePath))
+            {
+                Log.Error?.Out($"Директория для сохранения файлов не существует: {savePath}. Файл не сохранен.");
+                return;
+            }
+            string nFileName;
+            if (htTabPars.CurrentFileName == null)
+            {
+                string[] files = Directory.GetFiles(savePath);
+                int numLen;
+                string pattern = GetPattern(fileName, out numLen);
+                Regex regex = new Regex(pattern);
+                int maxNumber = 0;
+                for (int i = 0; i < files.Length; i++)
+                {
+                    string curFileName = Path.GetFileNameWithoutExtension(files[i]);
+                    if (!regex.IsMatch(curFileName)) continue;
+                    string[] parts = Regex.Split(curFileName, @"\D+");
+                    for (int j = 0; j < parts.Length; j++)
+                    {
+                        if (!string.IsNullOrEmpty(parts[j]))
+                        {
+                            int number = int.Parse(parts[j]);
+                            if (number > maxNumber) maxNumber = number;
+                            break;
+                        }
+                    }
+                }
+                string numAsString = (maxNumber + 1).ToString("D" + numLen);
+                nFileName = fileName.Replace(new string('*', numLen), numAsString);
+            }
+            else
+            {
+                nFileName = htTabPars.CurrentFileName;
+            }
+
+            string fullFileName;
+            switch (fileType)
+            {
+                case FileType.Fdi:
+                    fullFileName = Path.Combine(savePath, Path.ChangeExtension(nFileName, ".fdi"));
+                    File.WriteAllBytes(fullFileName, htTabPars.Image.ToFdi(null, diskReader.Params.SectorsOnTrack * 2));
+                    break;
+
+                case FileType.Trd:
+                case FileType.ModifiedTrd:
+                    fullFileName = Path.Combine(savePath, Path.ChangeExtension(nFileName, ".trd"));
+                    File.WriteAllBytes(fullFileName, ((TrDosImage)htTabPars.Image).ToTrd(diskReader.Params.SectorsOnTrack * 2, fileType == FileType.ModifiedTrd));
+                    break;
+
+                case FileType.Kdi:
+                    fullFileName = Path.Combine(savePath, Path.ChangeExtension(nFileName, ".kdi"));
+                    File.WriteAllBytes(fullFileName, ((CpmImage)htTabPars.Image).ToKdi(diskReader.Params.SectorsOnTrack * 2));
+                    break;
+
+                default:
+                    throw new Exception();
+            }
+            htTabPars.CurrentFileName = fullFileName;
+            htTabPars.Image.ResetModify();
+            htTabPars.Image.Name = nFileName;
+            Log.Info?.Out($"Файл сохранен. Sectors: {htTabPars.Image.FileSectorsSize} ({Math.Ceiling((double)htTabPars.Image.FileSectorsSize / htTabPars.Image.SectorsOnTrack)} tracks) | Good: {htTabPars.Image.GoodSectors} | Bad: {htTabPars.Image.BadSectors} | Имя: {fullFileName}");
+        }
+
+        private void HtRefreshControls()
+        {
+            if (htTabPars.Image != null)
+            {
+                htTabPars.Map.Repaint();
+                htTabPars.StatsTable.Repaint();
+            }
+        }
+
+        private void C_HtAbort_Click(object sender, EventArgs e)
+        {
+            if (diskReader != null) diskReader.Aborted = true;
+            htTabPars.Processing = false;
+            HtSetEnabled(true);
+        }
+
+        private void C_SelectSavePathTrDos_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog folderDialog = new FolderBrowserDialog();
+            folderDialog.SelectedPath = htTabPars.TrDosDir;
+            if (folderDialog.ShowDialog() != DialogResult.OK) return;
+            htTabPars.TrDosDir = folderDialog.SelectedPath;
+        }
+
+        private void C_SelectSavePathIsDos_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog folderDialog = new FolderBrowserDialog();
+            folderDialog.SelectedPath = htTabPars.IsDosDir;
+            if (folderDialog.ShowDialog() != DialogResult.OK) return;
+            htTabPars.IsDosDir = folderDialog.SelectedPath;
+        }
+
+        private void C_SelectSavePathCpm_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog folderDialog = new FolderBrowserDialog();
+            folderDialog.SelectedPath = htTabPars.CpmDir;
+            if (folderDialog.ShowDialog() != DialogResult.OK) return;
+            htTabPars.CpmDir = folderDialog.SelectedPath;
+        }
+
+        protected void HtSetEnabled(bool parsValid)
+        {
+            C_NewDisk.Enabled = htTabPars.Enabled && !htTabPars.Processing && parsValid;
+            C_RepeatReading.Enabled = htTabPars.Enabled && !htTabPars.Processing && htTabPars.Image != null && parsValid;
+            C_HtSave.Enabled = htTabPars.Enabled && !htTabPars.Processing && htTabPars.Image != null && parsValid;
+            C_HtAbort.Enabled = htTabPars.Enabled && htTabPars.Processing;
+        }
+
+        public bool HtReadParameters()
+        {
+            int trackTo;
+            bool sraValid = Int32.TryParse(C_HtSectorReadAttempts.Text, out htTabPars.SectorReadAttempts) && htTabPars.SectorReadAttempts > 0;
+            bool tlValid = Int32.TryParse(C_HtMaxTracks.Text, out trackTo) && trackTo > 0 && trackTo <= MainForm.MaxTrack;
+            C_HtSectorReadAttempts.BackColor = sraValid ? SystemColors.Window : Color.Red;
+            C_HtMaxTracks.BackColor = tlValid ? SystemColors.Window : Color.Red;
+            if (tlValid) htTabPars.Map.TrackTo = trackTo;
+            htTabPars.Map.Repaint();
+            htTabPars.MaxTracks = trackTo;
+            htTabPars.DataRate = ReaderBase.DataRateArray[C_HtDataRate.SelectedIndex];
+            bool disValid = Int32.TryParse(C_HtDefaultImageSize.Text, out htTabPars.DefaultImageSizeInTracks)
+                && htTabPars.DefaultImageSizeInTracks > 0
+                && htTabPars.DefaultImageSizeInTracks <= 172;
+            C_HtDefaultImageSize.BackColor = disValid ? SystemColors.Window : Color.Red;
+            bool numberOfReadsValid = Int32.TryParse(C_HtNumberOfReads.Text, out htTabPars.NumberOfReads) && htTabPars.NumberOfReads >= 0;
+            C_HtNumberOfReads.BackColor = numberOfReadsValid ? SystemColors.Window : Color.Red;
+            htTabPars.TrDosChecked = C_HtTrDosCheckBox.Checked;
+            htTabPars.IsDosChecked = C_HtIsDosCheckBox.Checked;
+            htTabPars.CpmChecked = C_HtCpmCheckBox.Checked;
+            htTabPars.TrDosFileName = C_FilePatternTrDos.Text;
+            htTabPars.IsDosFileName = C_FilePatternIsDos.Text;
+            htTabPars.CpmFileName = C_FilePatternCpm.Text;
+            htTabPars.TrDosFileType = HtTabPars.TrDosFileTypes[C_FileTypeTrDos.SelectedIndex];
+            htTabPars.IsDosFileType = HtTabPars.IsDosFileTypes[C_FileTypeIsDos.SelectedIndex];
+            htTabPars.CpmFileType = HtTabPars.CpmFileTypes[C_FileTypeCpm.SelectedIndex];
+            htTabPars.RandomReadTurnedOn = C_HtRandomReadOn.Checked;
+            bool timeoutValid = TimeSpan.TryParse(C_HtTimeout.Text, out htTabPars.RandomReadTimeout);
+            C_HtTimeout.BackColor = timeoutValid ? SystemColors.Window : Color.Red;
+            bool stopOnnthFailValid = Int32.TryParse(C_HtStopOnNthFail.Text, out htTabPars.RandomReadStopOnNthFail) & htTabPars.RandomReadStopOnNthFail >= 0;
+            C_HtStopOnNthFail.BackColor = stopOnnthFailValid ? SystemColors.Window : Color.Red;
+            return sraValid && tlValid && disValid && numberOfReadsValid && stopOnnthFailValid && timeoutValid;
+        }
+
+        public void HtFillParameters()
+        {
+            htTabPars.ParametersChanging = true;
+            C_HtTrDosCheckBox.Checked = htTabPars.TrDosChecked;
+            C_HtIsDosCheckBox.Checked = htTabPars.IsDosChecked;
+            C_HtCpmCheckBox.Checked = htTabPars.CpmChecked;
+            C_FilePatternTrDos.Text = htTabPars.TrDosFileName;
+            C_FilePatternIsDos.Text = htTabPars.IsDosFileName;
+            C_FilePatternCpm.Text = htTabPars.CpmFileName;
+            C_FileTypeTrDos.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.TrDosFileType, HtTabPars.TrDosFileTypes);
+            C_FileTypeIsDos.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.IsDosFileType, HtTabPars.IsDosFileTypes);
+            C_FileTypeCpm.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.CpmFileType, HtTabPars.CpmFileTypes);
+            C_HtDataRate.SelectedIndex = HtTabPars.GetDataRateIndex(htTabPars.DataRate, ReaderBase.DataRateArray);
+            C_HtSectorReadAttempts.Text = htTabPars.SectorReadAttempts.ToString();
+            C_HtDefaultImageSize.Text = htTabPars.DefaultImageSizeInTracks.ToString();
+            C_HtMaxTracks.Text = htTabPars.MaxTracks.ToString();
+            C_HtNumberOfReads.Text = htTabPars.NumberOfReads.ToString();
+            C_HtRandomReadOn.Checked = htTabPars.RandomReadTurnedOn;
+            C_HtTimeout.Text = htTabPars.RandomReadTimeout.Hours.ToString("D2") + ":" + htTabPars.RandomReadTimeout.Minutes.ToString("D2") + ":"
+                + htTabPars.RandomReadTimeout.Seconds.ToString("D2");
+            C_HtStopOnNthFail.Text = htTabPars.RandomReadStopOnNthFail.ToString();
+            htTabPars.ParametersChanging = false;
+        }
+
+        private void C_FilePatternTrDos_TextChanged(object sender, EventArgs e)
+        {
+            if (htTabPars.ParametersChanging) return;
+            HtSetEnabled(HtReadParameters());
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (tabControl1.SelectedIndex == 5 && C_NewDisk.Enabled && keyData == Keys.F4)
+            {
+                C_NewDisk_Click(null, null);
+            }
+            if (tabControl1.SelectedIndex == 5 && C_HtAbort.Enabled && keyData == Keys.Escape)
+            {
+                C_HtAbort_Click(null, null);
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
     }
 }

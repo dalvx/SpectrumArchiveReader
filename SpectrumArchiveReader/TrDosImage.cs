@@ -89,12 +89,13 @@ namespace SpectrumArchiveReader
 
         public TrDosImage(int sizeSectors, Map map) : base(256, 16, sizeSectors, map)
         {
+            StandardFormat = TrackFormat.TrDos;
             map?.BuildMap(Data, Sectors);
         }
 
         public TrDosImage() : base(256, 16, 0, null)
         {
-
+            StandardFormat = TrackFormat.TrDos;
         }
 
         public override void SectorsChanged(int index, int length = 1)
@@ -275,11 +276,12 @@ namespace SpectrumArchiveReader
             return sb.ToString();
         }
 
-        public byte[] ToTrd(int minSizeSectors)
+        public byte[] ToTrd(int minSizeSectors, bool modified)
         {
             int size = Math.Max(FileSectorsSize, minSizeSectors);
             byte[] r = new byte[size * SectorSize];
             Array.Copy(Data, 0, r, 0, Math.Min(r.Length, Data.Length));
+            if (!modified) return r;
             for (int i = 0; i < size; i++)
             {
                 if (i < Sectors.Length)

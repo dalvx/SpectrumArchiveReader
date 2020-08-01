@@ -969,5 +969,8 @@ namespace SpectrumArchiveReader
 
         [DllImport("gdi32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
         public static extern int SetDCBrushColor(IntPtr hdc, int color);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        public static extern void RtlZeroMemory(IntPtr dst, UIntPtr length);
     }
 }

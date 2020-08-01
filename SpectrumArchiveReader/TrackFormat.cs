@@ -11,6 +11,13 @@ namespace SpectrumArchiveReader
 {
     public class TrackFormat : ICloneable
     {
+        public static TrackFormat TrDos = new TrackFormat(TrackFormatName.TrDosSequential);
+        public static TrackFormat Cpm = new TrackFormat(TrackFormatName.CpmSequential);
+        public static TrackFormat IsDos = new TrackFormat(TrackFormatName.IsDosSequential);
+
+        /// <summary>
+        /// Расположение секторов.
+        /// </summary>
         public MList<SectorInfo> Layout;
         /// <summary>
         /// Номер трека с которого было взята схема расположения секторов.
@@ -20,8 +27,17 @@ namespace SpectrumArchiveReader
         /// Индекс длинного сектора (с временем более 19 мс). Если такого сектора нет, то Int32.MinValue.
         /// </summary>
         public int LongSectorIndex;
+        /// <summary>
+        /// Таймер отсчитывющий время с момента последней синхронизации с концом сектора.
+        /// </summary>
         public Timer Timer = new Timer();
+        /// <summary>
+        /// Индекс сектора с концом которого была сделана последняя синхронизация.
+        /// </summary>
         private int syncSectorIndex;
+        /// <summary>
+        /// Номер трека на котором была сделана последняя синхронизация.
+        /// </summary>
         private int syncTrack;
         public double SpinTime;
         public TrackFormatName FormatName = TrackFormatName.NoHeaders;
@@ -98,7 +114,15 @@ namespace SpectrumArchiveReader
             syncTrack = trackFormat.syncTrack;
         }
 
-        public SectorInfo GetNextSector(int track, double waitTimeMs, int skip, out double timeAfterSync)
+        /// <summary>
+        /// Получение ближайшего к головке дисковода сектора в соответствии с моделью вращения диска.
+        /// </summary>
+        /// <param name="track">Трек</param>
+        /// <param name="waitTimeMs">Время которое надо пропустить.</param>
+        /// <param name="skip">Количество секторов которые надо пропустить.</param>
+        /// <param name="timeAfterSync">Время которое должно пройти с момента последней синхронизации до конца возвращенного сектора.</param>
+        /// <returns></returns>
+        public SectorInfo GetClosestSector(int track, double waitTimeMs, int skip, out double timeAfterSync)
         {
             timeAfterSync = 0;
             if (!IsSync) return Layout.Data[syncSectorIndex];
@@ -353,13 +377,45 @@ namespace SpectrumArchiveReader
             }
         }
 
-        public int FindSectorIndex(int sectorF1)
+        public int FindSectorIndex(int sectorNumber)
         {
             for (int i = 0; i < Layout.Cnt; i++)
             {
-                if (Layout.Data[i].SectorNumber == sectorF1) return i;
+                if (Layout.Data[i].SectorNumber == sectorNumber) return i;
             }
             return -1;
+        }
+
+        public bool ContainsSectorsFrom(TrackFormat trackFormat, int cylinder)
+        {
+            for (int i = 0; i < Layout.Cnt; i++)
+            {
+                int index = trackFormat.FindSectorIndex(Layout.Data[i].SectorNumber);
+                if (index >= 0
+                    && Layout.Data[i].SizeCode == trackFormat.Layout.Data[index].SizeCode
+                    && (cylinder < 0 || Layout.Data[i].Cylinder == cylinder))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool ContainsOtherSectors(TrackFormat trackFormat, int cylinder)
+        {
+            for (int i = 0; i < Layout.Cnt; i++)
+            {
+                int index = trackFormat.FindSectorIndex(Layout.Data[i].SectorNumber);
+                if ((index < 0)
+                    || (cylinder >= 0 && Layout.Data[i].Cylinder != cylinder))
+                    return true;
+            }
+            return false;
+        }
+
+        public bool DoesSatisfyFormat(TrackFormat trackFormat, int cylinder)
+        {
+            return ContainsSectorsFrom(trackFormat, cylinder) && !ContainsOtherSectors(trackFormat, cylinder);
         }
 
         public string ToStringAsSectorArray()
@@ -504,6 +560,15 @@ namespace SpectrumArchiveReader
                 case 3:
                     return 1024;
 
+                case 4:
+                    return 2048;
+
+                case 5:
+                    return 4096;
+
+                case 6:
+                    return 8192;
+
                 default:
                     throw new Exception();
             }
@@ -524,6 +589,15 @@ namespace SpectrumArchiveReader
 
                 case 1024:
                     return 3;
+
+                case 2048:
+                    return 4;
+
+                case 4096:
+                    return 5;
+
+                case 8192:
+                    return 6;
             }
             throw new Exception();
         }

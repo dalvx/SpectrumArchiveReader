@@ -25,5 +25,18 @@ namespace SpectrumArchiveReader
         {
             return d.ToString("F" + decimals, NumberFormatInfo);
         }
+
+        /// <summary>
+        /// Генератор Random. Для генерации инициализирующих значений всех других Random в приложении.
+        /// </summary>
+        private static Random generalRandom = new Random();
+        /// <summary>
+        /// Возвращает экземпляр класса Random с инициализацией случайным Seed.
+        /// </summary>
+        /// <returns></returns>
+        public static Random GetRandomInstance()
+        {
+            return new Random(generalRandom.Next(Int32.MaxValue));
+        }
     }
 }
