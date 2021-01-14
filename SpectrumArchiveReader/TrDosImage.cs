@@ -207,7 +207,7 @@ namespace SpectrumArchiveReader
             sb.AppendLine(indent + "    " + $"<tr><th>Deleted files</th><td>{DeletedFiles8Sector}</td></tr>");
             sb.AppendLine(indent + "    " + $"<tr><th>Sectors read</th><td>{ProcessedSectors}</td></tr>");
             sb.AppendLine(indent + "    " + $"<tr><th>Good sectors</th><td>{GoodSectors}</td></tr>");
-            sb.AppendLine(indent + "    " + $"<tr><th>Bad sectors</th><td>{BadSectors}</td></tr>");
+            sb.AppendLine(indent + "    " + $"<tr><th>Bad sectors</th><td>{NotGoodSectors}</td></tr>");
             sb.AppendLine(indent + "    " + $"<tr><th>Non-Zero sectors</th><td>{NonZeroSectors}</td></tr>");
             sb.AppendLine(indent + "</table>");
             sb.AppendLine(indent + "<table>");

@@ -9,12 +9,12 @@ namespace SpectrumArchiveReader
     public class Map
     {
         public ChartArea ChartArea;
-        public int TrackFrom;
-        public int TrackTo;
+        public int FirstTrack;
+        public int LastTrack;
         public DiskImage Image;
         public ImageStatsTable StatsTable;
-        private int trackFromOld;
-        private int trackToOld;
+        private int firstTrackOld;
+        private int lastTrackOld;
         public const int CellWidth = 6;
         public const int CellHeight = 6;
         public int MaxTrack;
@@ -167,7 +167,7 @@ namespace SpectrumArchiveReader
             SectorsOnTrack = sectorsOnTrack;
             WorkMap = new MapCell[MaxTrack * SectorsOnTrack];
             oldMap = new MapCell[MaxTrack * SectorsOnTrack];
-            trackFromOld = -1;
+            firstTrackOld = -1;
             for (int i = 0; i < oldMap.Length; i++)
             {
                 oldMap[i] = (MapCell)0xFFFF;
@@ -178,8 +178,8 @@ namespace SpectrumArchiveReader
         private void ChartArea_MouseDoubleClick(object sender, MouseEventArgs e)
         {
             if (!CanEditReadBounds) return;
-            TrackFrom = 0;
-            TrackTo = MainForm.MaxTrack;
+            FirstTrack = 0;
+            LastTrack = MainForm.MaxTrack;
             Repaint();
             ReadBoundsChanged?.Invoke(this, null);
         }
@@ -261,12 +261,12 @@ namespace SpectrumArchiveReader
             oldSectorArraySize = sectors.Length;
         }
 
-        public void Select(int trackFrom, int trackTo)
+        public void Select(int firstTrack, int lastTrack)
         {
-            TrackFrom = trackFrom;
-            TrackTo = trackTo;
+            FirstTrack = firstTrack;
+            LastTrack = lastTrack;
             ClearHighlight(MapCell.Highlighted | MapCell.Hover);
-            for (int i = trackFrom * SectorsOnTrack, last = trackTo * SectorsOnTrack; i < last; i++)
+            for (int i = firstTrack * SectorsOnTrack, last = lastTrack * SectorsOnTrack; i < last; i++)
             {
                 WorkMap[i] |= MapCell.Highlighted;
             }
@@ -328,7 +328,7 @@ namespace SpectrumArchiveReader
                     break;
                 }
             }
-            bool paintHeader = TrackFrom != trackFromOld || TrackTo != trackToOld;
+            bool paintHeader = FirstTrack != firstTrackOld || LastTrack != lastTrackOld;
             if (!paintMap && !paintHeader) return false;
             IntPtr DC = ChartArea.bDC;
             IntPtr penNull = WinApi.CreatePen(WinApi.PS_NULL, 1, (uint)ColorTranslator.ToWin32(Color.White));
@@ -358,14 +358,14 @@ namespace SpectrumArchiveReader
             }
             if (paintHeader)
             {
-                trackFromOld = TrackFrom;
-                trackToOld = TrackTo;
+                firstTrackOld = FirstTrack;
+                lastTrackOld = LastTrack;
                 WinApi.SetDCBrushColor(DC, ColorTranslator.ToWin32(backColor));
                 WinApi.Rectangle(DC, 0, stripHeight, MaxTrack * CellWidth + 1, headerHeight + 1);
-                if (TrackFrom > 0) WinApi.Rectangle(DC, 0, 0, TrackFrom * CellWidth + 1, stripHeight + 1);
-                if (TrackTo < MaxTrack) WinApi.Rectangle(DC, TrackTo * CellWidth, 0, MaxTrack * CellWidth + 1, stripHeight + 1);
+                if (FirstTrack > 0) WinApi.Rectangle(DC, 0, 0, FirstTrack * CellWidth + 1, stripHeight + 1);
+                if (LastTrack < MaxTrack) WinApi.Rectangle(DC, LastTrack * CellWidth, 0, MaxTrack * CellWidth + 1, stripHeight + 1);
                 WinApi.SetDCBrushColor(DC, ColorTranslator.ToWin32(Color.Black));
-                WinApi.Rectangle(DC, TrackFrom * CellWidth, 0, TrackTo * CellWidth + 1, stripHeight + 1);
+                WinApi.Rectangle(DC, FirstTrack * CellWidth, 0, LastTrack * CellWidth + 1, stripHeight + 1);
                 WinApi.Rectangle(DC, 160 * CellWidth, stripHeight + 1, 172 * CellWidth + 1, headerHeight);
             }
             WinApi.SelectObject(DC, oldPen);
@@ -516,7 +516,7 @@ namespace SpectrumArchiveReader
 
         private void MarkSelectionAsGood_Click(object sender, EventArgs e)
         {
-            Image.SetSectorsProcessResult(SectorProcessResult.Good, TrackFrom * SectorsOnTrack, (TrackTo - TrackFrom) * SectorsOnTrack);
+            Image.SetSectorsProcessResult(SectorProcessResult.Good, FirstTrack * SectorsOnTrack, (LastTrack - FirstTrack) * SectorsOnTrack);
             Repaint();
             StatsTable?.Repaint();
         }
@@ -530,7 +530,7 @@ namespace SpectrumArchiveReader
 
         private void MarkSelectionAsUnprocessed_Click(object sender, EventArgs e)
         {
-            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, TrackFrom * SectorsOnTrack, (TrackTo - TrackFrom) * SectorsOnTrack);
+            Image.SetSectorsProcessResult(SectorProcessResult.Unprocessed, FirstTrack * SectorsOnTrack, (LastTrack - FirstTrack) * SectorsOnTrack);
             Repaint();
             StatsTable?.Repaint();
         }

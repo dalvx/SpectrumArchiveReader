@@ -429,7 +429,8 @@ namespace SpectrumArchiveReader
 
         public static bool WaitIndex(IntPtr driverHandle)
         {
-            return DeviceIoControl(driverHandle, IOCTL_FD_WAIT_INDEX, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, IntPtr.Zero);
+            uint ret;
+            return DeviceIoControl(driverHandle, IOCTL_FD_WAIT_INDEX, IntPtr.Zero, 0, IntPtr.Zero, 0, out ret, IntPtr.Zero);
         }
 
         public static unsafe bool DumpRegister(IntPtr driverHandle, out tagFD_DUMPREG_RESULT dumpResult)
@@ -510,13 +511,14 @@ namespace SpectrumArchiveReader
             return r;
         }
 
-        public static unsafe IntPtr Open(DataRate dataRate)
+        public static unsafe IntPtr Open(DataRate dataRate, Drive drive)
         {
-            IntPtr handle = CreateFile("\\\\.\\fdraw0", EFileAccess.GenericRead | EFileAccess.GenericWrite, 0, IntPtr.Zero, ECreationDisposition.OpenExisting, 0, IntPtr.Zero);
+            string fileName = drive == Drive.A ? "\\\\.\\fdraw0" : "\\\\.\\fdraw1";
+            IntPtr handle = CreateFile(fileName, EFileAccess.GenericRead | EFileAccess.GenericWrite, 0, IntPtr.Zero, ECreationDisposition.OpenExisting, 0, IntPtr.Zero);
             if ((int)handle == INVALID_HANDLE_VALUE)
             {
                 int lastError = Marshal.GetLastWin32Error();
-                Log.Error?.Out($"Не удалось открыть драйвер: {lastError} {WinErrors.GetSystemMessage(lastError)}");
+                Log.Error?.Out($"Не удалось открыть драйвер: {lastError} {WinErrors.GetSystemMessage(lastError)} {(lastError == 2 ? $"(Drive {drive}: is not installed)" : "")}");
                 return handle;
             }
             uint dwRet;
@@ -589,7 +591,7 @@ namespace SpectrumArchiveReader
             return error;
         }
 
-        public static unsafe int ReadSectorF(IntPtr driverHandle, IntPtr memoryHandle, int cyl, int sector, int phead, int head, int gap, int datalen)
+        public static unsafe int ReadSectorF(IntPtr driverHandle, IntPtr memoryHandle, int cyl, int sector, int sizeCode, int phead, int head, int gap, int datalen)
         {
             uint dwRet;
             tagFD_READ_WRITE_PARAMS readParams = new tagFD_READ_WRITE_PARAMS()
@@ -599,37 +601,43 @@ namespace SpectrumArchiveReader
                 cyl = (byte)cyl,
                 head = (byte)head,
                 sector = (byte)sector,
-                size = 1,
+                size = (byte)sizeCode,
                 eot = (byte)(sector + 1),
                 gap = (byte)gap,
                 datalen = (byte)datalen,
             };
-            bool r = DeviceIoControl(driverHandle, IOCTL_FDCMD_READ_DATA, (IntPtr)(&readParams), (uint)sizeof(tagFD_READ_WRITE_PARAMS), memoryHandle, 256, out dwRet, IntPtr.Zero);
+            bool r = DeviceIoControl(driverHandle, IOCTL_FDCMD_READ_DATA, (IntPtr)(&readParams), (uint)sizeof(tagFD_READ_WRITE_PARAMS), memoryHandle, (uint)SectorInfo.GetSizeBytes(sizeCode), out dwRet, IntPtr.Zero);
             int error = !r ? Marshal.GetLastWin32Error() : 0;
-            Log.Trace?.Out($"Cyl: {cyl} | PHead: {phead} | Head: {head} | Sector: {sector} | Gap: {gap} | DataLen: {datalen} Error: {error} | Bytes Read: {dwRet}");
+            Log.Trace?.Out($"Cyl: {cyl} | PHead: {phead} | Head: {head} | Sector: {sector} | Gap: {gap} | DataLen: {datalen} | Error: {error} | Bytes Read: {dwRet}");
             return error;
         }
 
-        public static unsafe int ReadTrack(IntPtr driverHandle, IntPtr memoryHandle, int track, int sector, UpperSideHead upperSideHead)
+        public static unsafe int ReadTrack(IntPtr driverHandle, IntPtr memoryHandle, int track, int sector)
         {
-            tagFD_SEEK_PARAMS seekParams = new tagFD_SEEK_PARAMS()
-            {
-                cyl = (byte)(track >> 1),
-                head = upperSideHead == UpperSideHead.Head1 ? (byte)(track & 1) : (byte)0
-            };
             uint dwRet;
-            DeviceIoControl(driverHandle, IOCTL_FDCMD_SEEK, (IntPtr)(&seekParams), (uint)sizeof(tagFD_SEEK_PARAMS), IntPtr.Zero, 0, out dwRet, IntPtr.Zero);
+            //tagFD_READ_WRITE_PARAMS readParams = new tagFD_READ_WRITE_PARAMS()
+            //{
+            //    flags = FD_OPTION_MFM,
+            //    phead = (byte)(track & 1),
+            //    cyl = (byte)(track >> 1),
+            //    head = upperSideHead == UpperSideHead.Head1 ? (byte)(track & 1) : (byte)0,
+            //    //sector = 1,
+            //    //size = 1,
+            //    //eot = 1 + 16,
+            //    gap = 0x0a,
+            //    datalen = 0xff,
+            //};
             tagFD_READ_WRITE_PARAMS readParams = new tagFD_READ_WRITE_PARAMS()
             {
                 flags = FD_OPTION_MFM,
                 phead = (byte)(track & 1),
-                cyl = (byte)(track >> 1),
-                head = upperSideHead == UpperSideHead.Head1 ? (byte)(track & 1) : (byte)0,
-                sector = 1,
-                size = 1,
-                eot = 1 + 16,
-                gap = 0x0a,
-                datalen = 0xff,
+                cyl = (byte)(track / 2),
+                head = 0,
+                sector = 0,
+                size = 7,
+                eot = 0,
+                gap = 0,
+                datalen = 0,
             };
             bool r = DeviceIoControl(driverHandle, IOCTL_FDCMD_READ_TRACK, (IntPtr)(&readParams), (uint)sizeof(tagFD_READ_WRITE_PARAMS), memoryHandle, 65536, out dwRet, IntPtr.Zero);
             int error = !r ? Marshal.GetLastWin32Error() : 0;
@@ -873,12 +881,26 @@ namespace SpectrumArchiveReader
         Both
     }
 
+    public enum ScanMode
+    {
+        None,
+        UnscannedOnly,
+        Once,
+        EachTrackRead
+    }
+
     public enum DataRate : byte
     {
         FD_RATE_500K = 0,
         FD_RATE_300K = 1,
         FD_RATE_250K = 2,
         FD_RATE_1M = 3
+    }
+
+    public enum Drive
+    {
+        A,
+        B
     }
 
     public static class WinErrors
@@ -932,7 +954,7 @@ namespace SpectrumArchiveReader
 
                 // Free the buffer.
                 lpMsgBuf = LocalFree(lpMsgBuf);
-                return sRet;
+                return sRet.Trim('\r', '\n');
             }
             catch (Exception e)
             {

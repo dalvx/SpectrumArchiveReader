@@ -19,10 +19,10 @@ namespace SpectrumArchiveReader
         protected RadioButton sideBoth;
         protected Label sectorReadAttemptsL;
         protected TextBox sectorReadAttempts;
-        protected Label trackFromL;
-        protected TextBox trackFrom;
-        protected Label trackToL;
-        protected TextBox trackTo;
+        protected Label firstTrackL;
+        protected TextBox firstTrack;
+        protected Label lastTrackL;
+        protected TextBox lastTrack;
         protected GroupBox imageGB;
         protected Button newImage;
         protected Button loadImage;
@@ -47,6 +47,9 @@ namespace SpectrumArchiveReader
         protected GroupBox readModePanel;
         protected RadioButton readModeStandard;
         protected RadioButton readModeFast;
+        protected GroupBox drivePanel;
+        protected RadioButton driveA;
+        protected RadioButton driveB;
         protected bool aborted;
         protected Map map;
         protected ImageStatsTable stats;
@@ -60,6 +63,7 @@ namespace SpectrumArchiveReader
         public event EventHandler OperationCompleted;
         private bool processing;
         public bool Processing { get { return processing; } }
+        private bool parametersChanging;
         private bool enabled = true;
         public bool Enabled
         {
@@ -85,10 +89,10 @@ namespace SpectrumArchiveReader
             sideBoth = new RadioButton() { Parent = readSide, Left = 6, Top = 60, Text = "Both", AutoSize = true, Checked = true };
             sectorReadAttemptsL = new Label() { Parent = parent, Left = 312, Top = 3, Text = "Sector Read Attempts", AutoSize = true };
             sectorReadAttempts = new TextBox() { Parent = parent, Left = 315, Top = 19, Text = "1" };
-            trackFromL = new Label() { Parent = parent, Left = 313, Top = 44, Text = "Track From", AutoSize = true };
-            trackToL = new Label() { Parent = parent, Left = 375, Top = 44, Text = "Track To", AutoSize = true };
-            trackFrom = new TextBox() { Parent = parent, Left = 315, Top = 61, Width = 56, Text = "0" };
-            trackTo = new TextBox() { Parent = parent, Left = 378, Top = 61, Width = 56, Text = MainForm.MaxTrack.ToString() };
+            firstTrackL = new Label() { Parent = parent, Left = 313, Top = 44, Text = "First Track", AutoSize = true };
+            lastTrackL = new Label() { Parent = parent, Left = 375, Top = 44, Text = "Last Track", AutoSize = true };
+            firstTrack = new TextBox() { Parent = parent, Left = 315, Top = 61, Width = 56, Text = "0" };
+            lastTrack = new TextBox() { Parent = parent, Left = 378, Top = 61, Width = 56, Text = MainForm.MaxTrack.ToString() };
             imageGB = new GroupBox() { Parent = parent, Left = 651, Top = 5, Width = 381, Height = 213, Text = "Образ" };
             newImage = new Button() { Parent = imageGB, Left = 300, Top = 37, Width = 75, Height = 23, Text = "New" };
             loadImage = new Button() { Parent = imageGB, Left = 300, Top = 66, Width = 75, Height = 23, Text = "Load" };
@@ -113,12 +117,16 @@ namespace SpectrumArchiveReader
             readModeFast = new RadioButton() { Parent = readModePanel, Left = 6, Top = 39, Text = "Fast", AutoSize = true, Checked = Timer.IsHighResolution, Enabled = Timer.IsHighResolution };
             trackLayoutL = new Label() { Parent = parent, Left = 0, Top = 205, Text = "Sector Layout:", AutoSize = true };
             trackLayoutLV = new Label() { Parent = parent, Left = 75, Top = 205, Text = "...", AutoSize = true };
+            drivePanel = new GroupBox() { Parent = parent, Left = 152, Top = 9, Width = 46, Height = 62, Text = "Drive" };
+            driveA = new RadioButton() { Parent = drivePanel, Left = 6, Top = 19, Text = "A:", AutoSize = true, Checked = Params.Drive == Drive.A };
+            driveB = new RadioButton() { Parent = drivePanel, Left = 6, Top = 39, Text = "B:", AutoSize = true, Checked = Params.Drive == Drive.B };
             trackLayoutL.Visible = MainForm.Dev;
             trackLayoutLV.Visible = MainForm.Dev;
             for (int i = 0; i < DataRateArray.Length; i++)
             {
                 dataRate.Items.Add(DataRateArray[i].ToString().Replace("FD_RATE_" , ""));
             }
+            dataRate.MouseWheel += DataRate_MouseWheel;
             FillControls();
             stats = new ImageStatsTable(imageGB, SystemColors.Window, SystemColors.ControlText);
             stats.SetPosition(6, 16);
@@ -126,13 +134,13 @@ namespace SpectrumArchiveReader
             map = new Map(MainForm.MaxTrack, SectorSize, SectorsOnTrack, parent, Color.White, stats);
             map.SetPosition(0, 227);
             map.ReadBoundsChanged += Map_ReadBoundsChanged;
-            map.TrackFrom = Params.TrackFrom;
-            map.TrackTo = Params.TrackTo;
+            map.FirstTrack = Params.FirstTrack;
+            map.LastTrack = Params.LastTrack;
             map.Repaint();
 
             sectorReadAttempts.TextChanged += SectorReadAttempts_TextChanged;
-            trackFrom.TextChanged += SectorReadAttempts_TextChanged;
-            trackTo.TextChanged += SectorReadAttempts_TextChanged;
+            firstTrack.TextChanged += SectorReadAttempts_TextChanged;
+            lastTrack.TextChanged += SectorReadAttempts_TextChanged;
             side0.CheckedChanged += SectorReadAttempts_TextChanged;
             side1.CheckedChanged += SectorReadAttempts_TextChanged;
             sideBoth.CheckedChanged += SectorReadAttempts_TextChanged;
@@ -141,19 +149,27 @@ namespace SpectrumArchiveReader
             upperSide1.CheckedChanged += SectorReadAttempts_TextChanged;
             readModeStandard.CheckedChanged += SectorReadAttempts_TextChanged;
             readModeFast.CheckedChanged += SectorReadAttempts_TextChanged;
+            driveA.CheckedChanged += SectorReadAttempts_TextChanged;
+            driveB.CheckedChanged += SectorReadAttempts_TextChanged;
             abortButton.Click += AbortButton;
             setSize.Click += SetSize;
             parent.ResumeLayout(false);
         }
 
+        private void DataRate_MouseWheel(object sender, MouseEventArgs e)
+        {
+            ((HandledMouseEventArgs)e).Handled = true;
+        }
+
         private void FillControls()
         {
+            parametersChanging = true;
             side0.Checked = Params.Side == DiskSide.Side0;
             side1.Checked = Params.Side == DiskSide.Side1;
             sideBoth.Checked = Params.Side == DiskSide.Both;
             sectorReadAttempts.Text = Params.SectorReadAttempts.ToString();
-            trackFrom.Text = Params.TrackFrom.ToString();
-            trackTo.Text = Params.TrackTo.ToString();
+            firstTrack.Text = Params.FirstTrack.ToString();
+            lastTrack.Text = Params.LastTrack.ToString();
             for (int i = 0; i < DataRateArray.Length; i++)
             {
                 if (DataRateArray[i] == Params.DataRate)
@@ -167,16 +183,22 @@ namespace SpectrumArchiveReader
             upperSide0.Checked = Params.UpperSideHead == UpperSideHead.Head0;
             upperSide1.Checked = Params.UpperSideHead == UpperSideHead.Head1;
             upperSideAutodetect.Checked = Params.UpperSideHeadAutodetect;
+            driveA.Checked = Params.Drive == Drive.A;
+            driveB.Checked = Params.Drive == Drive.B;
+            parametersChanging = false;
         }
 
         private void Map_ReadBoundsChanged(object sender, EventArgs e)
         {
-            trackFrom.Text = map.TrackFrom.ToString();
-            trackTo.Text = map.TrackTo.ToString();
+            parametersChanging = true;
+            firstTrack.Text = map.FirstTrack.ToString();
+            lastTrack.Text = map.LastTrack.ToString();
+            parametersChanging = false;
         }
 
         protected void SectorReadAttempts_TextChanged(object sender, EventArgs e)
         {
+            if (parametersChanging) return;
             ReadParameters(false);
         }
 
@@ -255,22 +277,22 @@ namespace SpectrumArchiveReader
 
         public bool ReadParameters(bool checkBoundaries = true)
         {
-            int trackFrom;
-            int trackTo;
+            int firstTrack;
+            int lastTrack;
             bool sraValid = Int32.TryParse(sectorReadAttempts.Text, out Params.SectorReadAttempts) && Params.SectorReadAttempts > 0;
-            bool tfValid = Int32.TryParse(this.trackFrom.Text, out trackFrom) && trackFrom >= 0;
-            bool tlValid = Int32.TryParse(this.trackTo.Text, out trackTo) && trackTo > trackFrom && trackTo <= MainForm.MaxTrack;
+            bool tfValid = Int32.TryParse(this.firstTrack.Text, out firstTrack) && firstTrack >= 0;
+            bool tlValid = Int32.TryParse(this.lastTrack.Text, out lastTrack) && lastTrack > firstTrack && lastTrack <= MainForm.MaxTrack;
             sectorReadAttempts.BackColor = sraValid ? SystemColors.Window : Color.Red;
-            this.trackFrom.BackColor = tfValid ? SystemColors.Window : Color.Red;
-            this.trackTo.BackColor = tlValid ? SystemColors.Window : Color.Red;
-            if (tfValid) map.TrackFrom = trackFrom;
-            if (tlValid) map.TrackTo = trackTo;
+            this.firstTrack.BackColor = tfValid ? SystemColors.Window : Color.Red;
+            this.lastTrack.BackColor = tlValid ? SystemColors.Window : Color.Red;
+            if (tfValid) map.FirstTrack = firstTrack;
+            if (tlValid) map.LastTrack = lastTrack;
             map.Repaint();
-            Params.TrackFrom = trackFrom;
-            Params.TrackTo = trackTo;
-            Params.SectorNumFrom = Math.Min(trackFrom * SectorsOnTrack, Image.SizeSectors);
-            Params.SectorNumTo = Math.Min(trackTo * SectorsOnTrack, Image.SizeSectors);
-            if (checkBoundaries && Params.SectorNumFrom == Params.SectorNumTo)
+            Params.FirstTrack = firstTrack;
+            Params.LastTrack = lastTrack;
+            Params.FirstSectorNum = Math.Min(firstTrack * SectorsOnTrack, Image.SizeSectors);
+            Params.LastSectorNum = Math.Min(lastTrack * SectorsOnTrack, Image.SizeSectors);
+            if (checkBoundaries && Params.FirstSectorNum == Params.LastSectorNum)
             {
                 Log.Info?.Out($"Область чтения вне пределов образа.");
                 return false;
@@ -278,7 +300,7 @@ namespace SpectrumArchiveReader
             if (side0.Checked) Params.Side = DiskSide.Side0;
             if (side1.Checked) Params.Side = DiskSide.Side1;
             if (sideBoth.Checked) Params.Side = DiskSide.Both;
-            int notGood = Image.GetNotGoodBounds(Params.SectorNumFrom, Params.SectorNumTo, Params.Side, ref Params.SectorNumFrom, ref Params.SectorNumTo);
+            int notGood = Image.GetNotGoodBounds(Params.FirstSectorNum, Params.LastSectorNum, Params.Side, ref Params.FirstSectorNum, ref Params.LastSectorNum);
             if (checkBoundaries && notGood == 0)
             {
                 Log.Info?.Out($"Область чтения не содержит непрочитанных секторов.");
@@ -286,6 +308,7 @@ namespace SpectrumArchiveReader
             }
             Params.DataRate = DataRateArray[dataRate.SelectedIndex];
             Params.Image = Image;
+            Params.Drive = driveB.Checked ? Drive.B : Drive.A;
             return sraValid & tfValid & tlValid & ReadParametersCustom();
         }
     }

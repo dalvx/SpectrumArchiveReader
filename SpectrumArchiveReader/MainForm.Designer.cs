@@ -31,7 +31,6 @@
             this.components = new System.ComponentModel.Container();
             this.C_BuildFileTable = new System.Windows.Forms.Button();
             this.C_Log = new System.Windows.Forms.RichTextBox();
-            this.C_Abort = new System.Windows.Forms.Button();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.C_BuildDiskTable = new System.Windows.Forms.Button();
             this.C_BuildMaps = new System.Windows.Forms.Button();
@@ -53,15 +52,12 @@
             this.label31 = new System.Windows.Forms.Label();
             this.label23 = new System.Windows.Forms.Label();
             this.C_Help = new System.Windows.Forms.Button();
-            this.C_ScanDisk = new System.Windows.Forms.Button();
-            this.C_SaveDiskFormat = new System.Windows.Forms.Button();
-            this.C_NewDiskFormat = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.C_UIRefreshPeriod = new System.Windows.Forms.ComboBox();
             this.label2 = new System.Windows.Forms.Label();
             this.tabPage2 = new System.Windows.Forms.TabPage();
-            this.C_LoadDiskFormat = new System.Windows.Forms.Button();
+            this.C_Test2 = new System.Windows.Forms.Button();
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.tabPage5 = new System.Windows.Forms.TabPage();
@@ -101,12 +97,37 @@
             this.C_FilePatternTrDos = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
             this.C_SelectSavePathTrDos = new System.Windows.Forms.Button();
+            this.tabPage7 = new System.Windows.Forms.TabPage();
+            this.C_CfScanMode = new System.Windows.Forms.ComboBox();
+            this.label16 = new System.Windows.Forms.Label();
+            this.C_CfLoadFormat = new System.Windows.Forms.Button();
+            this.C_CfSaveFormat = new System.Windows.Forms.Button();
+            this.label15 = new System.Windows.Forms.Label();
+            this.label11 = new System.Windows.Forms.Label();
+            this.C_CfReadSide = new System.Windows.Forms.ComboBox();
+            this.C_CfReadRandomSectors = new System.Windows.Forms.Button();
+            this.C_CfReadBackward = new System.Windows.Forms.Button();
+            this.C_CfSectorReadAttempts = new System.Windows.Forms.TextBox();
+            this.label8 = new System.Windows.Forms.Label();
+            this.C_CfDataRate = new System.Windows.Forms.ComboBox();
+            this.C_CfClearImage = new System.Windows.Forms.Button();
+            this.C_CfLoadImage = new System.Windows.Forms.Button();
+            this.C_CfSave = new System.Windows.Forms.Button();
+            this.C_CfAbort = new System.Windows.Forms.Button();
+            this.C_CfReadForward = new System.Windows.Forms.Button();
+            this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.C_HtDriveA = new System.Windows.Forms.RadioButton();
+            this.C_HtDriveB = new System.Windows.Forms.RadioButton();
+            this.label17 = new System.Windows.Forms.Label();
+            this.C_CfDrive = new System.Windows.Forms.ComboBox();
             this.groupBox1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
             this.tabPage6.SuspendLayout();
             this.groupBox2.SuspendLayout();
+            this.tabPage7.SuspendLayout();
+            this.groupBox3.SuspendLayout();
             this.SuspendLayout();
             // 
             // C_BuildFileTable
@@ -127,16 +148,6 @@
             this.C_Log.TabIndex = 5;
             this.C_Log.Text = "";
             this.C_Log.WordWrap = false;
-            // 
-            // C_Abort
-            // 
-            this.C_Abort.Location = new System.Drawing.Point(537, 218);
-            this.C_Abort.Name = "C_Abort";
-            this.C_Abort.Size = new System.Drawing.Size(75, 23);
-            this.C_Abort.TabIndex = 13;
-            this.C_Abort.Text = "Abort";
-            this.C_Abort.UseVisualStyleBackColor = true;
-            this.C_Abort.Click += new System.EventHandler(this.C_Abort_Click);
             // 
             // timer1
             // 
@@ -344,36 +355,6 @@
             this.C_Help.UseVisualStyleBackColor = true;
             this.C_Help.Click += new System.EventHandler(this.C_Help_Click);
             // 
-            // C_ScanDisk
-            // 
-            this.C_ScanDisk.Location = new System.Drawing.Point(537, 110);
-            this.C_ScanDisk.Name = "C_ScanDisk";
-            this.C_ScanDisk.Size = new System.Drawing.Size(75, 23);
-            this.C_ScanDisk.TabIndex = 72;
-            this.C_ScanDisk.Text = "Scan Disk";
-            this.C_ScanDisk.UseVisualStyleBackColor = true;
-            this.C_ScanDisk.Click += new System.EventHandler(this.C_ScanDisk_Click);
-            // 
-            // C_SaveDiskFormat
-            // 
-            this.C_SaveDiskFormat.Location = new System.Drawing.Point(537, 138);
-            this.C_SaveDiskFormat.Name = "C_SaveDiskFormat";
-            this.C_SaveDiskFormat.Size = new System.Drawing.Size(75, 23);
-            this.C_SaveDiskFormat.TabIndex = 73;
-            this.C_SaveDiskFormat.Text = "Save";
-            this.C_SaveDiskFormat.UseVisualStyleBackColor = true;
-            this.C_SaveDiskFormat.Click += new System.EventHandler(this.C_SaveDiskFormat_Click);
-            // 
-            // C_NewDiskFormat
-            // 
-            this.C_NewDiskFormat.Location = new System.Drawing.Point(537, 163);
-            this.C_NewDiskFormat.Name = "C_NewDiskFormat";
-            this.C_NewDiskFormat.Size = new System.Drawing.Size(75, 23);
-            this.C_NewDiskFormat.TabIndex = 74;
-            this.C_NewDiskFormat.Text = "New";
-            this.C_NewDiskFormat.UseVisualStyleBackColor = true;
-            this.C_NewDiskFormat.Click += new System.EventHandler(this.C_NewDiskFormat_Click);
-            // 
             // tabControl1
             // 
             this.tabControl1.Controls.Add(this.tabPage1);
@@ -382,6 +363,7 @@
             this.tabControl1.Controls.Add(this.tabPage4);
             this.tabControl1.Controls.Add(this.tabPage5);
             this.tabControl1.Controls.Add(this.tabPage6);
+            this.tabControl1.Controls.Add(this.tabPage7);
             this.tabControl1.Location = new System.Drawing.Point(0, 3);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
@@ -438,17 +420,13 @@
             // 
             // tabPage2
             // 
-            this.tabPage2.Controls.Add(this.C_LoadDiskFormat);
+            this.tabPage2.Controls.Add(this.C_Test2);
             this.tabPage2.Controls.Add(this.C_SearchBytesInFiles);
             this.tabPage2.Controls.Add(this.C_DataRate);
             this.tabPage2.Controls.Add(this.groupBox1);
             this.tabPage2.Controls.Add(this.label1);
             this.tabPage2.Controls.Add(this.C_SearchInFiles);
             this.tabPage2.Controls.Add(this.C_Test);
-            this.tabPage2.Controls.Add(this.C_NewDiskFormat);
-            this.tabPage2.Controls.Add(this.C_Abort);
-            this.tabPage2.Controls.Add(this.C_SaveDiskFormat);
-            this.tabPage2.Controls.Add(this.C_ScanDisk);
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
@@ -457,15 +435,15 @@
             this.tabPage2.Text = "WRK";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
-            // C_LoadDiskFormat
+            // C_Test2
             // 
-            this.C_LoadDiskFormat.Location = new System.Drawing.Point(618, 163);
-            this.C_LoadDiskFormat.Name = "C_LoadDiskFormat";
-            this.C_LoadDiskFormat.Size = new System.Drawing.Size(75, 23);
-            this.C_LoadDiskFormat.TabIndex = 75;
-            this.C_LoadDiskFormat.Text = "Load";
-            this.C_LoadDiskFormat.UseVisualStyleBackColor = true;
-            this.C_LoadDiskFormat.Click += new System.EventHandler(this.C_LoadDiskFormat_Click);
+            this.C_Test2.Location = new System.Drawing.Point(21, 256);
+            this.C_Test2.Name = "C_Test2";
+            this.C_Test2.Size = new System.Drawing.Size(120, 23);
+            this.C_Test2.TabIndex = 61;
+            this.C_Test2.Text = "Test 2";
+            this.C_Test2.UseVisualStyleBackColor = true;
+            this.C_Test2.Click += new System.EventHandler(this.C_Test2_Click);
             // 
             // tabPage3
             // 
@@ -496,6 +474,7 @@
             // 
             // tabPage6
             // 
+            this.tabPage6.Controls.Add(this.groupBox3);
             this.tabPage6.Controls.Add(this.C_HtNumberOfReads);
             this.tabPage6.Controls.Add(this.label3);
             this.tabPage6.Controls.Add(this.groupBox2);
@@ -883,6 +862,269 @@
             this.C_SelectSavePathTrDos.UseVisualStyleBackColor = true;
             this.C_SelectSavePathTrDos.Click += new System.EventHandler(this.C_SelectSavePathTrDos_Click);
             // 
+            // tabPage7
+            // 
+            this.tabPage7.Controls.Add(this.C_CfDrive);
+            this.tabPage7.Controls.Add(this.label17);
+            this.tabPage7.Controls.Add(this.C_CfScanMode);
+            this.tabPage7.Controls.Add(this.label16);
+            this.tabPage7.Controls.Add(this.C_CfLoadFormat);
+            this.tabPage7.Controls.Add(this.C_CfSaveFormat);
+            this.tabPage7.Controls.Add(this.label15);
+            this.tabPage7.Controls.Add(this.label11);
+            this.tabPage7.Controls.Add(this.C_CfReadSide);
+            this.tabPage7.Controls.Add(this.C_CfReadRandomSectors);
+            this.tabPage7.Controls.Add(this.C_CfReadBackward);
+            this.tabPage7.Controls.Add(this.C_CfSectorReadAttempts);
+            this.tabPage7.Controls.Add(this.label8);
+            this.tabPage7.Controls.Add(this.C_CfDataRate);
+            this.tabPage7.Controls.Add(this.C_CfClearImage);
+            this.tabPage7.Controls.Add(this.C_CfLoadImage);
+            this.tabPage7.Controls.Add(this.C_CfSave);
+            this.tabPage7.Controls.Add(this.C_CfAbort);
+            this.tabPage7.Controls.Add(this.C_CfReadForward);
+            this.tabPage7.Location = new System.Drawing.Point(4, 22);
+            this.tabPage7.Name = "tabPage7";
+            this.tabPage7.Size = new System.Drawing.Size(1033, 358);
+            this.tabPage7.TabIndex = 6;
+            this.tabPage7.Text = "Custom Format";
+            this.tabPage7.UseVisualStyleBackColor = true;
+            // 
+            // C_CfScanMode
+            // 
+            this.C_CfScanMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_CfScanMode.FormattingEnabled = true;
+            this.C_CfScanMode.Items.AddRange(new object[] {
+            "None",
+            "Unscanned Only",
+            "Once",
+            "Each Track Read"});
+            this.C_CfScanMode.Location = new System.Drawing.Point(606, 33);
+            this.C_CfScanMode.Name = "C_CfScanMode";
+            this.C_CfScanMode.Size = new System.Drawing.Size(114, 21);
+            this.C_CfScanMode.TabIndex = 50;
+            // 
+            // label16
+            // 
+            this.label16.AutoSize = true;
+            this.label16.Location = new System.Drawing.Point(535, 40);
+            this.label16.Name = "label16";
+            this.label16.Size = new System.Drawing.Size(65, 13);
+            this.label16.TabIndex = 49;
+            this.label16.Text = "Scan Mode:";
+            // 
+            // C_CfLoadFormat
+            // 
+            this.C_CfLoadFormat.Location = new System.Drawing.Point(628, 5);
+            this.C_CfLoadFormat.Name = "C_CfLoadFormat";
+            this.C_CfLoadFormat.Size = new System.Drawing.Size(75, 23);
+            this.C_CfLoadFormat.TabIndex = 48;
+            this.C_CfLoadFormat.Text = "Load Format";
+            this.C_CfLoadFormat.UseVisualStyleBackColor = true;
+            this.C_CfLoadFormat.Click += new System.EventHandler(this.C_CfLoadFormat_Click);
+            // 
+            // C_CfSaveFormat
+            // 
+            this.C_CfSaveFormat.Location = new System.Drawing.Point(547, 5);
+            this.C_CfSaveFormat.Name = "C_CfSaveFormat";
+            this.C_CfSaveFormat.Size = new System.Drawing.Size(75, 23);
+            this.C_CfSaveFormat.TabIndex = 47;
+            this.C_CfSaveFormat.Text = "Save Format";
+            this.C_CfSaveFormat.UseVisualStyleBackColor = true;
+            this.C_CfSaveFormat.Click += new System.EventHandler(this.C_CfSaveFormat_Click);
+            // 
+            // label15
+            // 
+            this.label15.AutoSize = true;
+            this.label15.Location = new System.Drawing.Point(430, 13);
+            this.label15.Name = "label15";
+            this.label15.Size = new System.Drawing.Size(59, 13);
+            this.label15.TabIndex = 46;
+            this.label15.Text = "Data Rate:";
+            // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.Location = new System.Drawing.Point(249, 40);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(60, 13);
+            this.label11.TabIndex = 45;
+            this.label11.Text = "Read Side:";
+            // 
+            // C_CfReadSide
+            // 
+            this.C_CfReadSide.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_CfReadSide.FormattingEnabled = true;
+            this.C_CfReadSide.Items.AddRange(new object[] {
+            "Side 0",
+            "Side 1",
+            "Both"});
+            this.C_CfReadSide.Location = new System.Drawing.Point(312, 32);
+            this.C_CfReadSide.Name = "C_CfReadSide";
+            this.C_CfReadSide.Size = new System.Drawing.Size(56, 21);
+            this.C_CfReadSide.TabIndex = 44;
+            this.C_CfReadSide.SelectedIndexChanged += new System.EventHandler(this.C_CfSectorReadAttempts_TextChanged);
+            // 
+            // C_CfReadRandomSectors
+            // 
+            this.C_CfReadRandomSectors.Location = new System.Drawing.Point(106, 32);
+            this.C_CfReadRandomSectors.Name = "C_CfReadRandomSectors";
+            this.C_CfReadRandomSectors.Size = new System.Drawing.Size(131, 23);
+            this.C_CfReadRandomSectors.TabIndex = 42;
+            this.C_CfReadRandomSectors.Text = "Read Random Sectors";
+            this.C_CfReadRandomSectors.UseVisualStyleBackColor = true;
+            this.C_CfReadRandomSectors.Click += new System.EventHandler(this.C_CfReadForward_Click);
+            // 
+            // C_CfReadBackward
+            // 
+            this.C_CfReadBackward.Location = new System.Drawing.Point(8, 32);
+            this.C_CfReadBackward.Name = "C_CfReadBackward";
+            this.C_CfReadBackward.Size = new System.Drawing.Size(92, 23);
+            this.C_CfReadBackward.TabIndex = 41;
+            this.C_CfReadBackward.Text = "Read Backward";
+            this.C_CfReadBackward.UseVisualStyleBackColor = true;
+            this.C_CfReadBackward.Click += new System.EventHandler(this.C_CfReadForward_Click);
+            // 
+            // C_CfSectorReadAttempts
+            // 
+            this.C_CfSectorReadAttempts.Location = new System.Drawing.Point(492, 34);
+            this.C_CfSectorReadAttempts.Name = "C_CfSectorReadAttempts";
+            this.C_CfSectorReadAttempts.Size = new System.Drawing.Size(37, 20);
+            this.C_CfSectorReadAttempts.TabIndex = 40;
+            this.C_CfSectorReadAttempts.Text = "1";
+            this.C_CfSectorReadAttempts.TextChanged += new System.EventHandler(this.C_CfSectorReadAttempts_TextChanged);
+            // 
+            // label8
+            // 
+            this.label8.AutoSize = true;
+            this.label8.Location = new System.Drawing.Point(375, 37);
+            this.label8.Name = "label8";
+            this.label8.Size = new System.Drawing.Size(114, 13);
+            this.label8.TabIndex = 39;
+            this.label8.Text = "Sector Read Attempts:";
+            // 
+            // C_CfDataRate
+            // 
+            this.C_CfDataRate.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_CfDataRate.FormattingEnabled = true;
+            this.C_CfDataRate.Items.AddRange(new object[] {
+            "250K",
+            "300K",
+            "500K",
+            "1M"});
+            this.C_CfDataRate.Location = new System.Drawing.Point(492, 5);
+            this.C_CfDataRate.Name = "C_CfDataRate";
+            this.C_CfDataRate.Size = new System.Drawing.Size(49, 21);
+            this.C_CfDataRate.TabIndex = 38;
+            this.C_CfDataRate.SelectedIndexChanged += new System.EventHandler(this.C_CfSectorReadAttempts_TextChanged);
+            // 
+            // C_CfClearImage
+            // 
+            this.C_CfClearImage.Location = new System.Drawing.Point(349, 3);
+            this.C_CfClearImage.Name = "C_CfClearImage";
+            this.C_CfClearImage.Size = new System.Drawing.Size(75, 23);
+            this.C_CfClearImage.TabIndex = 4;
+            this.C_CfClearImage.Text = "New Image";
+            this.C_CfClearImage.UseVisualStyleBackColor = true;
+            this.C_CfClearImage.Click += new System.EventHandler(this.C_CfClearImage_Click);
+            // 
+            // C_CfLoadImage
+            // 
+            this.C_CfLoadImage.Location = new System.Drawing.Point(268, 3);
+            this.C_CfLoadImage.Name = "C_CfLoadImage";
+            this.C_CfLoadImage.Size = new System.Drawing.Size(75, 23);
+            this.C_CfLoadImage.TabIndex = 3;
+            this.C_CfLoadImage.Text = "Load";
+            this.C_CfLoadImage.UseVisualStyleBackColor = true;
+            this.C_CfLoadImage.Click += new System.EventHandler(this.C_CfLoadImage_Click);
+            // 
+            // C_CfSave
+            // 
+            this.C_CfSave.Location = new System.Drawing.Point(187, 3);
+            this.C_CfSave.Name = "C_CfSave";
+            this.C_CfSave.Size = new System.Drawing.Size(75, 23);
+            this.C_CfSave.TabIndex = 2;
+            this.C_CfSave.Text = "Save";
+            this.C_CfSave.UseVisualStyleBackColor = true;
+            this.C_CfSave.Click += new System.EventHandler(this.C_CfSave_Click);
+            // 
+            // C_CfAbort
+            // 
+            this.C_CfAbort.Location = new System.Drawing.Point(106, 3);
+            this.C_CfAbort.Name = "C_CfAbort";
+            this.C_CfAbort.Size = new System.Drawing.Size(75, 23);
+            this.C_CfAbort.TabIndex = 1;
+            this.C_CfAbort.Text = "Abort";
+            this.C_CfAbort.UseVisualStyleBackColor = true;
+            this.C_CfAbort.Click += new System.EventHandler(this.C_CfAbort_Click);
+            // 
+            // C_CfReadForward
+            // 
+            this.C_CfReadForward.Location = new System.Drawing.Point(8, 3);
+            this.C_CfReadForward.Name = "C_CfReadForward";
+            this.C_CfReadForward.Size = new System.Drawing.Size(92, 23);
+            this.C_CfReadForward.TabIndex = 0;
+            this.C_CfReadForward.Text = "Read Forward";
+            this.C_CfReadForward.UseVisualStyleBackColor = true;
+            this.C_CfReadForward.Click += new System.EventHandler(this.C_CfReadForward_Click);
+            // 
+            // groupBox3
+            // 
+            this.groupBox3.Controls.Add(this.C_HtDriveB);
+            this.groupBox3.Controls.Add(this.C_HtDriveA);
+            this.groupBox3.Location = new System.Drawing.Point(558, 104);
+            this.groupBox3.Name = "groupBox3";
+            this.groupBox3.Size = new System.Drawing.Size(46, 64);
+            this.groupBox3.TabIndex = 61;
+            this.groupBox3.TabStop = false;
+            this.groupBox3.Text = "Drive";
+            // 
+            // C_HtDriveA
+            // 
+            this.C_HtDriveA.AutoSize = true;
+            this.C_HtDriveA.Location = new System.Drawing.Point(6, 16);
+            this.C_HtDriveA.Name = "C_HtDriveA";
+            this.C_HtDriveA.Size = new System.Drawing.Size(35, 17);
+            this.C_HtDriveA.TabIndex = 0;
+            this.C_HtDriveA.TabStop = true;
+            this.C_HtDriveA.Text = "A:";
+            this.C_HtDriveA.UseVisualStyleBackColor = true;
+            this.C_HtDriveA.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // C_HtDriveB
+            // 
+            this.C_HtDriveB.AutoSize = true;
+            this.C_HtDriveB.Location = new System.Drawing.Point(6, 39);
+            this.C_HtDriveB.Name = "C_HtDriveB";
+            this.C_HtDriveB.Size = new System.Drawing.Size(35, 17);
+            this.C_HtDriveB.TabIndex = 1;
+            this.C_HtDriveB.TabStop = true;
+            this.C_HtDriveB.Text = "B:";
+            this.C_HtDriveB.UseVisualStyleBackColor = true;
+            this.C_HtDriveB.CheckedChanged += new System.EventHandler(this.C_FilePatternTrDos_TextChanged);
+            // 
+            // label17
+            // 
+            this.label17.AutoSize = true;
+            this.label17.Location = new System.Drawing.Point(8, 66);
+            this.label17.Name = "label17";
+            this.label17.Size = new System.Drawing.Size(35, 13);
+            this.label17.TabIndex = 51;
+            this.label17.Text = "Drive:";
+            // 
+            // C_CfDrive
+            // 
+            this.C_CfDrive.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.C_CfDrive.FormattingEnabled = true;
+            this.C_CfDrive.Items.AddRange(new object[] {
+            "A:",
+            "B:"});
+            this.C_CfDrive.Location = new System.Drawing.Point(44, 58);
+            this.C_CfDrive.Name = "C_CfDrive";
+            this.C_CfDrive.Size = new System.Drawing.Size(34, 21);
+            this.C_CfDrive.TabIndex = 52;
+            this.C_CfDrive.SelectedIndexChanged += new System.EventHandler(this.C_CfSectorReadAttempts_TextChanged);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -909,6 +1151,10 @@
             this.tabPage6.PerformLayout();
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
+            this.tabPage7.ResumeLayout(false);
+            this.tabPage7.PerformLayout();
+            this.groupBox3.ResumeLayout(false);
+            this.groupBox3.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -917,7 +1163,6 @@
 
         private System.Windows.Forms.Button C_BuildFileTable;
         private System.Windows.Forms.RichTextBox C_Log;
-        private System.Windows.Forms.Button C_Abort;
         private System.Windows.Forms.Timer timer1;
         private System.Windows.Forms.Button C_BuildDiskTable;
         private System.Windows.Forms.Button C_BuildMaps;
@@ -939,9 +1184,6 @@
         private System.Windows.Forms.Label label31;
         private System.Windows.Forms.Label label23;
         private System.Windows.Forms.Button C_Help;
-        private System.Windows.Forms.Button C_ScanDisk;
-        private System.Windows.Forms.Button C_SaveDiskFormat;
-        private System.Windows.Forms.Button C_NewDiskFormat;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TabPage tabPage2;
@@ -949,7 +1191,6 @@
         private System.Windows.Forms.TabPage tabPage4;
         private System.Windows.Forms.ComboBox C_UIRefreshPeriod;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.Button C_LoadDiskFormat;
         private System.Windows.Forms.TabPage tabPage5;
         private System.Windows.Forms.TabPage tabPage6;
         private System.Windows.Forms.Button C_HtAbort;
@@ -987,6 +1228,30 @@
         private System.Windows.Forms.TextBox C_HtNumberOfReads;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.CheckBox C_HtRandomReadOn;
+        private System.Windows.Forms.TabPage tabPage7;
+        private System.Windows.Forms.Button C_CfReadForward;
+        private System.Windows.Forms.Button C_CfAbort;
+        private System.Windows.Forms.Button C_CfSave;
+        private System.Windows.Forms.Button C_CfLoadImage;
+        private System.Windows.Forms.Button C_CfClearImage;
+        private System.Windows.Forms.Button C_CfReadRandomSectors;
+        private System.Windows.Forms.Button C_CfReadBackward;
+        private System.Windows.Forms.TextBox C_CfSectorReadAttempts;
+        private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.ComboBox C_CfDataRate;
+        private System.Windows.Forms.ComboBox C_CfReadSide;
+        private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.Label label15;
+        private System.Windows.Forms.Button C_CfSaveFormat;
+        private System.Windows.Forms.Button C_CfLoadFormat;
+        private System.Windows.Forms.ComboBox C_CfScanMode;
+        private System.Windows.Forms.Label label16;
+        private System.Windows.Forms.Button C_Test2;
+        private System.Windows.Forms.GroupBox groupBox3;
+        private System.Windows.Forms.RadioButton C_HtDriveB;
+        private System.Windows.Forms.RadioButton C_HtDriveA;
+        private System.Windows.Forms.ComboBox C_CfDrive;
+        private System.Windows.Forms.Label label17;
     }
 }
 

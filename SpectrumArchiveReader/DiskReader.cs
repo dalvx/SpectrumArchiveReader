@@ -18,6 +18,7 @@ namespace SpectrumArchiveReader
         private Timer scanFormatTotalTime = new Timer();
         private TrackFormat workTrackFormat = new TrackFormat(55);
         private TrackFormat longestTrackFormat = new TrackFormat(55);
+        private TrackFormat scanFormatBuffer = new TrackFormat(55);
         public IntPtr DriverHandle;
         private IntPtr memoryHandle;
 
@@ -33,7 +34,7 @@ namespace SpectrumArchiveReader
 
         public bool OpenDriver()
         {
-            DriverHandle = Driver.Open(Params.DataRate);
+            DriverHandle = Driver.Open(Params.DataRate, Params.Drive);
             if ((int)DriverHandle == Driver.INVALID_HANDLE_VALUE) return false;
             memoryHandle = Driver.VirtualAlloc(8192);
             if (memoryHandle == IntPtr.Zero) return false;
@@ -66,7 +67,7 @@ namespace SpectrumArchiveReader
                 UpperSideHead upperSideHead = Params.UpperSideHead;
                 bool upperSideHeadScanned = false;
                 MList<int> sectorArray = new MList<int>(Params.Image.SizeSectors);
-                for (int i = Params.SectorNumFrom; i < Params.SectorNumTo; i++)
+                for (int i = Params.FirstSectorNum; i < Params.LastSectorNum; i++)
                 {
                     int track = i / Params.Image.SectorsOnTrack;
                     if (Params.Side == DiskSide.Side0 && track % 2 != 0) continue;
@@ -101,7 +102,7 @@ namespace SpectrumArchiveReader
                         upperSideHeadScanned = true;
                     }
                     bool noHeader = false;
-                    bool badSectorWritten = false;
+                    bool badWritten = Params.Image.Sectors[sectorNum] == SectorProcessResult.Bad;
                     for (int attempt = 0; attempt < Params.SectorReadAttempts; attempt++)
                     {
                         if (Aborted) goto abort;
@@ -110,10 +111,10 @@ namespace SpectrumArchiveReader
                         {
                             int tempCylinder = cylinder + (random.Next(2) == 0 ? -1 : 1);
                             tempCylinder = Math.Max(0, tempCylinder);
-                            tempCylinder = Math.Min(tempCylinder, Params.TrackTo / 2);
+                            tempCylinder = Math.Min(tempCylinder, Params.LastTrack / 2);
                             Driver.Seek(DriverHandle, tempCylinder * 2);
                             if (Aborted) goto abort;
-                            Thread.Sleep(random.Next(200)); // Ждем случайное время чтобы приехать на нужный цилиндр в случайной точке.
+                            Thread.Sleep(random.Next((int)TrackFormat.SpinTimeStandard)); // Ждем случайное время чтобы приехать на нужный цилиндр в случайной точке.
                         }
                         prevCylinder = cylinder;
                         Driver.Seek(DriverHandle, track);
@@ -123,18 +124,11 @@ namespace SpectrumArchiveReader
                         sectorTimer.Stop();
                         if (error == 0) goto sectorReadSuccessfully;
                         noHeader = error == 21 || (error == 27 && sectorTimer.ElapsedMs > Params.CurrentTrackFormat.SpinTime);
-                        if (error == 21)
+                        Make30HeadPositionings(error, track);
+                        if (error == 23)
                         {
-                            for (int u = 0; u < 30; u++)
-                            {
-                                if (Aborted) goto abort;
-                                Driver.Seek(DriverHandle, track);
-                            }
-                        }
-                        else if (error == 23)
-                        {
-                            Params.Image.WriteBadSectors(sectorNum, memoryHandle, 1, noHeader);
-                            badSectorWritten = true;
+                            Params.Image.WriteBadSectors(sectorNum, memoryHandle, 1, false);
+                            badWritten = true;
                         }
                         if (noHeader && track % 2 == 1 && Params.UpperSideHeadAutodetect && trackHead[track] == -1)
                         {
@@ -153,15 +147,7 @@ namespace SpectrumArchiveReader
                         }
                     }
                     failCounter++;
-                    if (!badSectorWritten) Params.Image.WriteBadSectors(sectorNum, 1, noHeader);
-                    if (error == 21)
-                    {
-                        for (int u = 0; u < 30; u++)
-                        {
-                            if (Aborted) goto abort;
-                            Driver.Seek(DriverHandle, track);
-                        }
-                    }
+                    if (!badWritten) Params.Image.WriteBadSectors(sectorNum, 1, noHeader);
                     continue;
                     sectorReadSuccessfully:
                     Params.Image.WriteGoodSectors(sectorNum, memoryHandle, 1);
@@ -181,55 +167,6 @@ namespace SpectrumArchiveReader
             return Params.Image.GoodSectors - goodSectors;
         }
 
-        public MList<TrackFormat> ScanDiskFormat(MList<TrackFormat> diskFormat)
-        {
-            try
-            {
-                int trackFrom = Params.TrackFrom;
-                int prevCylinder = -1;
-                int trackTo = Params.TrackTo;
-                TrackFormat trackFormat = new TrackFormat(55);
-                trackTimer.Restart();
-                for (int track = trackFrom; track < trackTo; track++)
-                {
-                    if (diskFormat[track].FormatName <= TrackFormatName.TrDosGeneric) continue;
-                    if (Aborted) goto abort;
-                    int cylinder = track / 2;
-                    if (cylinder != prevCylinder)
-                    {
-                        Driver.Seek(DriverHandle, track);
-                        if (Aborted) goto abort;
-                        prevCylinder = cylinder;
-                    }
-                    for (int attempt = 0; attempt < Params.SectorReadAttempts; attempt++)
-                    {
-                        ScanFormat(trackFormat, track, true);
-                        if (Aborted) goto abort;
-                        if (diskFormat[track].Layout.Cnt < trackFormat.Layout.Cnt) diskFormat[track].Assign(trackFormat);
-                        if (trackFormat.Layout.Cnt == 0)
-                        {
-                            Log.Info?.Out($"Заголовки не найдены. Трек: {track}");
-                            continue;
-                        }
-                        else if (trackFormat.FormatName == TrackFormatName.Unrecognized)
-                        {
-                            Log.Info?.Out($"Формат не TR-DOS ({trackFormat.Layout.Cnt} секторов) Трек: {track}");
-                            continue;
-                        }
-                        break;
-                    }
-                }
-                return diskFormat;
-                abort:
-                Log.Info?.Out("Сканирование прервано.");
-                return diskFormat;
-            }
-            finally
-            {
-                Params.Image.Map?.ClearHighlight(MapCell.Processing);
-            }
-        }
-
         /// <summary>
         /// Чтение вперед. Возвращает количество успешно прочитанных секторов.
         /// </summary>
@@ -242,12 +179,12 @@ namespace SpectrumArchiveReader
             try
             {
                 GCSettings.LatencyMode = GCLatencyMode.LowLatency;
-                int trackFrom = Params.SectorNumFrom / Params.SectorsOnTrack;
+                int firstTrack = Params.FirstSectorNum / Params.SectorsOnTrack;
                 int prevCylinder = -1;
-                int trackTo = (int)Math.Ceiling((double)Params.SectorNumTo / Params.SectorsOnTrack);
+                int lastTrack = (int)Math.Ceiling((double)Params.LastSectorNum / Params.SectorsOnTrack);
                 trackTimer.Restart();
                 bool upperHeadScanned = false;
-                for (int track = trackFrom; track < trackTo; track++)
+                for (int track = firstTrack; track < lastTrack; track++)
                 {
                     if (Aborted) goto abort;
                     if (Params.Side == DiskSide.Side0 && (track % 2 != 0)) continue;
@@ -305,12 +242,12 @@ namespace SpectrumArchiveReader
             try
             {
                 GCSettings.LatencyMode = GCLatencyMode.LowLatency;
-                int trackFrom = Params.SectorNumFrom / Params.SectorsOnTrack;
+                int firstTrack = Params.FirstSectorNum / Params.SectorsOnTrack;
                 int prevCylinder = -1;
-                int trackTo = (int)Math.Ceiling((double)Params.SectorNumTo / Params.SectorsOnTrack);
+                int lastTrack = (int)Math.Ceiling((double)Params.LastSectorNum / Params.SectorsOnTrack);
                 trackTimer.Restart();
                 bool upperHeadScanned = false;
-                for (int track = trackTo - 1; track >= trackFrom; track--)
+                for (int track = lastTrack - 1; track >= firstTrack; track--)
                 {
                     if (Aborted) goto abort;
                     if (Params.Side == DiskSide.Side0 && (track % 2 != 0)) continue;
@@ -392,8 +329,12 @@ namespace SpectrumArchiveReader
                     bool sync = false;
                     if (pars.ReadMode == ReadMode.Fast && pars.CurrentTrackFormat.IsSync)
                     {
-                        diskSector = pars.CurrentTrackFormat.GetClosestSector(track, 0, skip, out timeAfterSync);
+                        bool gcsError;
+                        diskSector = pars.CurrentTrackFormat.GetClosestSector(track, 0, skip, out timeAfterSync, out gcsError);
                         sync = true;
+                        // Переключение в стандартный режим чтения в случае если функция GetClosestSector отработала с ошибкой.
+                        // Такое было у одного из пользователей и причина ошибки непонятна.
+                        if (gcsError) pars.ReadMode = ReadMode.Standard;
                     }
                     else
                     {
@@ -407,8 +348,9 @@ namespace SpectrumArchiveReader
                     sectors[sectorIndex] |= 1;
                     processedSectors++;
                     if ((sectors[sectorIndex] & 4) != 0) continue;
-                    if (diskSectorNum < pars.SectorNumFrom || diskSectorNum >= pars.SectorNumTo) continue;
+                    if (diskSectorNum < pars.FirstSectorNum || diskSectorNum >= pars.LastSectorNum) continue;
                     if (pars.Image.Sectors[diskSectorNum] == SectorProcessResult.Good) continue;
+                    bool badWritten = pars.Image.Sectors[diskSectorNum] == SectorProcessResult.Bad;
                     skip = 0;
                     pars.Image.Map?.ClearHighlight(MapCell.Processing);
                     pars.Image.Map?.MarkAsProcessing(diskSectorNum);
@@ -437,7 +379,7 @@ namespace SpectrumArchiveReader
                                 // 6 - половина времени сектора TR-DOS (около 12 мс).
                                 if (Math.Abs(remainderTime - timeAfterSync) <= 6) goto skip;
                             }
-                            Log.Trace?.Out($"Несовпадение расположения секторов. Calculated Time: {GP.ToString(timeAfterSync, 2)} | Real Time: {GP.ToString(curTimeSinceSync, 2)} | Remainder Time: {GP.ToString(remainderTime, 2)}");
+                            Log.Trace?.Out($"Несовпадение расположения секторов. Calculated Time: {GP.ToString(timeAfterSync, 2)} | Real Time: {GP.ToString(curTimeSinceSync, 2)}");
                             formatScanned = true;
                             bool scanResult = ScanFormat(workTrackFormat, track, true);
                             if (Aborted) return;
@@ -455,30 +397,11 @@ namespace SpectrumArchiveReader
                     {
                         wasError = true;
                         bool writeBad = true;
-                        bool noHeader = error == 21 || error == 1112 || (error == 27 && curTimeSinceSync > pars.CurrentTrackFormat.SpinTime);
+                        bool noHeader = error == 21 || error == 1112 || error == 1122 || (error == 27 /* && curTimeSinceSync > pars.CurrentTrackFormat.SpinTime*/);
                         if (noHeader)
                         {
-                            // Здесь делается 30 вызовов позиционирования.
-                            // Причина в следующем. Если случается ошибка 21, то серия следующих чтений приводит к ошибке 21
-                            // (не важно где эти чтения происходят, даже если треки находятся далеко от того где произошла первоначальная ошибка 21).
-                            // Последующие ошибки 21 не вызывают новых ошибок 21 (иначе эта серия продолжалась бы бесконечно).
-                            // Но если сделать вызов Seek около 16-20 раз, то этот эффект исчезает и можно читать следующий сектор, который вернет 
-                            // его ошибку, а не просто повторит 21.
-                            // Следующая проблема заключается в том что после ошибки 21, и даже после последующих 20 команд Seek, 
-                            // команда ReadId всегда возвращает false даже если сектора существуют на диске.
-                            // Поскольку она используется для определения параметра Head верхней стороны диска,
-                            // и используется именно при ошибке 21, то получается что она становится неработоспособной именно тогда когда оказывается нужна.
-                            // Но потом выяснилось что если вызвать 30 позиционирований (а не 20), то начинает работать команда ReadId и читать заголовки.
-                            // Поэтому здесь делается 30 вызовов Seek. Работает и 50 и 300 вызовов Seek, но я решил сделать число поменьше на всякий случай.
-                            // Неизвестно нужно ли это делать если ошибка была 27 (т.е. когда заголовок не найден и есть синхроимпульс), и будет ли произведена
-                            // рекалибрация после такой ошибки.
-
-                            for (int u = 0; u < 30; u++)
-                            {
-                                if (Aborted) return;
-                                Driver.Seek(DriverHandle, track);
-                            }
-
+                            Make30HeadPositionings(error, track);
+                            
                             // Проверка параметра Head верхней стороны.
 
                             bool scanWholeTrack = true;
@@ -516,8 +439,8 @@ namespace SpectrumArchiveReader
 
                             if (scanWholeTrack && !trackScanned)
                             {
-                                int sec0Num = Math.Max(track * pars.SectorsOnTrack, pars.SectorNumFrom);
-                                int sec0NtNum = Math.Min((track + 1) * pars.SectorsOnTrack, pars.SectorNumTo);
+                                int sec0Num = Math.Max(track * pars.SectorsOnTrack, pars.FirstSectorNum);
+                                int sec0NtNum = Math.Min((track + 1) * pars.SectorsOnTrack, pars.LastSectorNum);
                                 // sectorsToCheck - число секторов которые надо проверить на предмет отсутствия заголовков.
                                 // Если подозреваемый сектор только один (т.е. только что прочитанный) и число попыток чтения 1, то sectorsToCheck после цикла будет нулём.
                                 bool ignoreCurSector = pars.SectorReadAttempts == 1;
@@ -610,7 +533,7 @@ namespace SpectrumArchiveReader
                                             // 4 (100b) означает что заголовок не найден за нужное число попыток 
                                             // и больше читать этот сектор не надо, т.к. все попытки исчерпаны.
                                             sectors[si] |= 4;
-                                            pars.Image.WriteBadSectors(sn, 1, true);
+                                            if (!badWritten) pars.Image.WriteBadSectors(sn, 1, true);
                                             noHeaderCnt++;
                                         }
                                     }
@@ -629,7 +552,7 @@ namespace SpectrumArchiveReader
                             writeBad = false;
                             pars.Image.WriteBadSectors(diskSectorNum, memoryHandle, 1, false);
                         }
-                        if (writeBad) pars.Image.WriteBadSectors(diskSectorNum, 1, noHeader);
+                        if (writeBad && !badWritten) pars.Image.WriteBadSectors(diskSectorNum, 1, noHeader);
                     }
                     if (Aborted) return;
                 }
@@ -642,16 +565,15 @@ namespace SpectrumArchiveReader
         /// <summary>
         /// Сканирование трека. Сканировать может в двух режимах: по времени оборота диска и по зацикливанию потока секторов.
         /// При сканировании по времени оборота диска скорость диска должна быть в районе 300 об/мин, т.е. замедлять диск не надо, иначе будут ошибки.
-        /// Если byLooping == true, то конец трека определяется по зацикливанию потока секторов, но сектора сканируются не менее 150 мс и не более 300 мс.
-        /// 21.05.2020: Сканирование по времени работает плохо если делается при шаге головки без задержек, не находит один сектор как правило.
-        /// 25.07.2020: Диск должен быть раскручен, иначе время на раскрутку исчерпает таймаут.
+        /// Если byLooping == true, то конец трека определяется по зацикливанию потока секторов, но сектора сканируются не менее 150 мс и не более 1000 мс.
         /// </summary>
         /// <param name="track"></param>
         /// <returns></returns>
         public unsafe bool ScanFormat(TrackFormat result, int track, bool byLooping)
         {
-            SectorInfo* ilayout = stackalloc SectorInfo[55];
             int ilayoutCnt = 0;
+            scanFormatBuffer.Layout.Cnt = 0;
+            SectorInfo[] layout = scanFormatBuffer.Layout.Data;
             tagFD_READ_ID_PARAMS pars = new tagFD_READ_ID_PARAMS()
             {
                 flags = Driver.FD_OPTION_MFM,
@@ -659,32 +581,25 @@ namespace SpectrumArchiveReader
             };
             tagFD_CMD_RESULT cmdResult = new tagFD_CMD_RESULT();
             scanFormatStopwatch.Restart();
-            scanFormatTotalTime.Restart();
-            int sector1Index = 0;
-            tagFD_CMD_RESULT firstHeaderEncountered = new tagFD_CMD_RESULT();
-            for (int i = 0; i < 55; i++)
+            scanFormatTotalTime.Stop();
+            int firstIndex = 1;
+            for (int i = 0; i < scanFormatBuffer.Layout.Capacity; i++)
             {
                 if (Aborted) return false;
                 if (!Driver.ReadId(DriverHandle, pars, out cmdResult))
                 {
-                    Log.Trace?.Out($"Функция ReadId вернула false. i={i}. LastError={Marshal.GetLastWin32Error()}");
-                    // Хак для устранения серийности ошибки при отсутствии INDX.
-                    for (int t = 0; t < 30; t++)
-                    {
-                        Driver.Seek(DriverHandle, track);
-                    }
-                    break;
+                    int error = Marshal.GetLastWin32Error();
+                    Log.Trace?.Out($"Функция ReadId вернула false. i={i}. LastError={error}");
+                    if (Aborted) return false;
+                    Make30HeadPositionings(error, track);
+                    if (scanFormatBuffer.Layout.Cnt == 0) goto success;
+                    return false;
                 }
                 double timeMs = scanFormatStopwatch.ElapsedMs;
                 scanFormatStopwatch.Restart();
-                if (i == 0)
-                {
-                    firstHeaderEncountered = cmdResult;
-                    continue;
-                }
-                if (!byLooping && scanFormatTotalTime.ElapsedMs > 209) break;
-                if (cmdResult.sector == 1) sector1Index = ilayoutCnt;
-                ilayout[ilayoutCnt++] = new SectorInfo()
+                if (!scanFormatTotalTime.IsRunning) scanFormatTotalTime.Restart();
+                if (!byLooping && scanFormatTotalTime.ElapsedMs > 209) goto success;
+                layout[ilayoutCnt] = new SectorInfo()
                 {
                     Cylinder = cmdResult.cyl,
                     Head = cmdResult.head,
@@ -692,18 +607,44 @@ namespace SpectrumArchiveReader
                     SizeCode = cmdResult.size,
                     TimeMs = timeMs
                 };
-                if (byLooping
-                    && cmdResult.cyl == firstHeaderEncountered.cyl
-                    && cmdResult.head == firstHeaderEncountered.head
-                    && cmdResult.sector == firstHeaderEncountered.sector
-                    && cmdResult.size == firstHeaderEncountered.size
-                    && scanFormatTotalTime.ElapsedMs > 150)
+                ilayoutCnt++;
+                scanFormatBuffer.Layout.Cnt = ilayoutCnt;
+
+                // Бывают случаи когда заголовок сектора читается на первом обороте и не читается на втором.
+                // Из-за этого алгоритм, в котором повтор сектора определяется сравнением с первым прочитанным заголовком, иногда даёт сбои.
+                // Поэтому ищем встечался ли ранее только что прочитанный сектор среди всех прочитанных заголовков, а не только сравниваем с первым.
+                // По отношению к найденному сектору замеряем время вращения. Если оно больше 250 мс, значит этот сектор был пропущен на одном из оборотов 
+                // и такую последовательность брать нельзя. Если время меньше 150, значит на треке есть сектора с одинаковыми параметрами.
+
+                if (byLooping)
                 {
-                    break;
+                    for (int u = 0; u < ilayoutCnt - 1; u++)
+                    {
+                        if (layout[u].Cylinder == cmdResult.cyl
+                            && layout[u].Head == cmdResult.head
+                            && layout[u].SectorNumber == cmdResult.sector
+                            && layout[u].SizeCode == cmdResult.size)
+                        {
+                            double spinTime = 0;
+                            for (int p = u + 1; p < ilayoutCnt; p++)
+                            {
+                                spinTime += layout[p].TimeMs;
+                            }
+                            if (spinTime > 250 || spinTime < 150) continue;
+                            firstIndex = u + 1;
+                            goto success;
+                        }
+                    }
+                    if (scanFormatTotalTime.ElapsedMs > 1000)
+                    {
+                        Log.Trace?.Out($"Не удалось найти цикл в последовательности секторов из-за нестабильного чтения. Сканироваие прервано по таймауту.");
+                        return false;
+                    }
                 }
-                if (byLooping && scanFormatTotalTime.ElapsedMs > 300) break;
             }
-            result.AcceptLayout(track, ilayout, ilayoutCnt, cmdResult.sector);
+            return false;
+            success:
+            result.AssignLayout(scanFormatBuffer, track, cmdResult.sector, firstIndex);
             Log.Trace?.Out($"Время сканирования трека {track}: {GP.ToString(scanFormatTotalTime.ElapsedMs, 2)}");
             return true;
         }
@@ -761,16 +702,45 @@ namespace SpectrumArchiveReader
                     {
                         realMaxTrack = track + 1;
                         image.SetSize(realMaxTrack * Params.SectorsOnTrack);
-                        Params.SectorNumTo = image.SizeSectors;
+                        Params.LastSectorNum = image.SizeSectors;
                         ReadTrack(track, Params);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Здесь делается 30 вызовов позиционирования.
+        /// Причина в следующем.Если случается ошибка 21, то серия следующих чтений приводит к ошибке 21
+        /// (не важно где эти чтения происходят, даже если треки находятся далеко от того где произошла первоначальная ошибка 21).
+        /// Последующие ошибки 21 не вызывают новых ошибок 21 (иначе эта серия продолжалась бы бесконечно).
+        /// Но если сделать вызов Seek около 16-20 раз, то этот эффект исчезает и можно читать следующий сектор, который вернет
+        /// его ошибку, а не просто повторит 21.
+        /// Следующая проблема заключается в том что после ошибки 21, и даже после последующих 20 команд Seek,
+        /// команда ReadId всегда возвращает false даже если сектора существуют на диске.
+        /// Поскольку она используется для определения параметра Head верхней стороны диска,
+        /// и используется именно при ошибке 21, то получается что она становится неработоспособной именно тогда когда оказывается нужна.
+        /// Но потом выяснилось что если вызвать 30 позиционирований (а не 20), то начинает работать команда ReadId и читать заголовки.
+        /// Поэтому здесь делается 30 вызовов Seek. Работает и 50 и 300 вызовов Seek, но я решил сделать число поменьше на всякий случай.
+        /// Неизвестно нужно ли это делать если ошибка была 27 (т.е.когда заголовок не найден и есть синхроимпульс), и будет ли произведена
+        /// рекалибрация после такой ошибки.
+        /// </summary>
+        /// <param name="error">Код ошибки. 30 позиционирований будет сделано если он равен 21.</param>
+        /// <param name="track"></param>
+        public void Make30HeadPositionings(int error, int track)
+        {
+            if (error != 21) return;
+            for (int u = 0; u < 30; u++)
+            {
+                if (Aborted) return;
+                Driver.Seek(DriverHandle, track);
             }
         }
     }
 
     public class DiskReaderParams : ICloneable
     {
+        public Drive Drive;
         public UpperSideHead UpperSideHead;
         public bool UpperSideHeadAutodetect;
         public ReadMode ReadMode;
@@ -778,18 +748,18 @@ namespace SpectrumArchiveReader
         public TrackFormat CurrentTrackFormat = new TrackFormat(16);
         public DataRate DataRate;
         public DiskImage Image;
-        public int SectorNumFrom;
+        public int FirstSectorNum;
         /// <summary>
         /// Параметр не должен выходить за границы образа (может быть равен числу секторов образа).
         /// </summary>
-        public int SectorNumTo;
+        public int LastSectorNum;
         public DiskSide Side;
         /// <summary>
         /// Параметр должен быть больше нуля.
         /// </summary>
         public int SectorReadAttempts;
-        public int TrackFrom;
-        public int TrackTo;
+        public int FirstTrack;
+        public int LastTrack;
 
         public int SectorsOnTrack { get { return Image.StandardFormat.Layout.Cnt; } }
 
@@ -803,29 +773,31 @@ namespace SpectrumArchiveReader
         public void SaveToXml(XmlTextWriter xml, string name)
         {
             xml.WriteStartElement(name);
+            xml.WriteAttributeString("Drive", Drive.ToString());
             xml.WriteAttributeString("DataRate", DataRate.ToString());
             xml.WriteAttributeString("Side", Side.ToString());
             xml.WriteAttributeString("ReadMode", ReadMode.ToString());
             xml.WriteAttributeString("UpperSideHead", UpperSideHead.ToString());
             xml.WriteAttributeString("UpperSideHeadAutodetect", UpperSideHeadAutodetect.ToString());
             xml.WriteAttributeString("SectorReadAttempts", SectorReadAttempts.ToString());
-            xml.WriteAttributeString("TrackFrom", TrackFrom.ToString());
-            xml.WriteAttributeString("TrackTo", TrackTo.ToString());
+            xml.WriteAttributeString("FirstTrack", FirstTrack.ToString());
+            xml.WriteAttributeString("LastTrack", LastTrack.ToString());
             xml.WriteEndElement();
         }
 
         public void ReadFromXml(XmlTextReader xml)
         {
+            Drive = (Drive)Enum.Parse(typeof(Drive), xml.GetAttribute("Drive"));
             DataRate = (DataRate)Enum.Parse(typeof(DataRate), xml.GetAttribute("DataRate"));
             Side = (DiskSide)Enum.Parse(typeof(DiskSide), xml.GetAttribute("Side"));
             ReadMode = (ReadMode)Enum.Parse(typeof(ReadMode), xml.GetAttribute("ReadMode"));
             UpperSideHead = (UpperSideHead)Enum.Parse(typeof(UpperSideHead), xml.GetAttribute("UpperSideHead"));
             UpperSideHeadAutodetect = bool.Parse(xml.GetAttribute("UpperSideHeadAutodetect"));
             SectorReadAttempts = Math.Max(0, int.Parse(xml.GetAttribute("SectorReadAttempts")));
-            TrackFrom = Math.Max(0, int.Parse(xml.GetAttribute("TrackFrom")));
-            TrackFrom = Math.Min(171, TrackFrom);
-            TrackTo = Math.Min(172, int.Parse(xml.GetAttribute("TrackTo")));
-            TrackTo = Math.Max(0, TrackTo);
+            FirstTrack = Math.Max(0, int.Parse(xml.GetAttribute("FirstTrack")));
+            FirstTrack = Math.Min(171, FirstTrack);
+            LastTrack = Math.Min(172, int.Parse(xml.GetAttribute("LastTrack")));
+            LastTrack = Math.Max(0, LastTrack);
         }
     }
 

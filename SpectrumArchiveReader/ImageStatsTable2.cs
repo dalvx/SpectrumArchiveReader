@@ -6,10 +6,10 @@ using System.Windows.Forms;
 
 namespace SpectrumArchiveReader
 {
-    public class ImageStatsTable
+    public class ImageStatsTable2
     {
         public ChartArea ChartArea;
-        public DiskImage Image;
+        public DiskImage2 Image;
         private Color backColor;
         private Color foreColor;
         private Font font = new Font("Microsoft Sans Serif", 8.25f);
@@ -18,13 +18,13 @@ namespace SpectrumArchiveReader
             "Имя: ",
             "Треков:",
             "Секторов:",
-            "Размер файла образа:",
-            "Обработанных секторов:",
-            "Необработанных секторов: ",
+            //"Размер файла образа:",
+            //"Обработанных секторов:",
+            //"Необработанных секторов: ",
             "Good:",
             "Bad:",
-            "Каталог прочитан:",
-            "Поврежденных файлов:",
+            //"Каталог прочитан:",
+            //"Поврежденных файлов:",
             "Образ изменен:"
         };
         private int textHeight;
@@ -32,12 +32,10 @@ namespace SpectrumArchiveReader
         private int maxCaptionWidth;
         private string yes = "Да";
         private string no = "Нет";
-        private string tracks = " треков)";
-        private string from = " из ";
         private StringBuilder[] oldValues;
         private StringBuilder[] cvalues;
 
-        public ImageStatsTable(Control parent, Color backColor, Color foreColor)
+        public ImageStatsTable2(Control parent, Color backColor, Color foreColor)
         {
             ChartArea = new ChartArea(parent);
             this.backColor = backColor;
@@ -49,7 +47,7 @@ namespace SpectrumArchiveReader
                 oldValues[i] = new StringBuilder(64);
                 cvalues[i] = new StringBuilder(64);
             }
-            ChartArea.Size = new Size(289, 151);
+            ChartArea.Size = new Size(289, 78);
         }
 
         public void SetPosition(int left, int top)
@@ -68,52 +66,16 @@ namespace SpectrumArchiveReader
             cvalues[0].Append(Image.Name);
             AppendInt(cvalues[1], Image.SizeTracks);
             AppendInt(cvalues[2], Image.SizeSectors);
-            AppendInt(cvalues[3], Image.FileSectorsSize);
-            cvalues[3].Append(' ');
-            cvalues[3].Append('(');
-            AppendInt(cvalues[3], (int)Math.Ceiling((double)Image.FileSectorsSize / Image.SectorsOnTrack));
-            cvalues[3].Append(tracks);
-            AppendInt(cvalues[4], Image.ProcessedSectors);
-            AppendInt(cvalues[5], Image.UnprocessedSectors);
-            AppendInt(cvalues[6], Image.GoodSectors);
-            AppendInt(cvalues[7], Image.NotGoodSectors);
-            if (Image is TrDosImage)
-            {
-                TrDosImage image = (TrDosImage)Image;
-                if (image.CatIsRead)
-                {
-                    cvalues[8].Append(yes);
-                }
-                else
-                {
-                    if (image.Sectors.Length >= 9)
-                    {
-                        for (int i = 0; i < 9; i++)
-                        {
-                            if (Image.Sectors[i] != SectorProcessResult.Good) continue;
-                            for (int u = 0; u < 9; u++)
-                            {
-                                if (image.Sectors[u] == SectorProcessResult.Good)
-                                {
-                                    if (cvalues[8].Length > 0)
-                                    {
-                                        cvalues[8].Append(',');
-                                        cvalues[8].Append(' ');
-                                    }
-                                    AppendInt(cvalues[8], u);
-                                }
-                            }
-                            goto skip;
-                        }
-                        cvalues[8].Append(no);
-                        skip:;
-                    }
-                }
-                AppendInt(cvalues[9], image.DamagedFiles);
-                cvalues[9].Append(from);
-                AppendInt(cvalues[9], image.FileCountUntil0);
-            }
-            cvalues[10].Append(Image.Modified ? yes : no);
+            //AppendInt(cvalues[3], Image.FileSectorsSize);
+            //cvalues[3].Append(' ');
+            //cvalues[3].Append('(');
+            //AppendInt(cvalues[3], (int)Math.Ceiling((double)Image.FileSectorsSize / Image.SectorsOnTrack));
+            //cvalues[3].Append(tracks);
+            //AppendInt(cvalues[4], Image.ProcessedSectors);
+            //AppendInt(cvalues[5], Image.UnprocessedSectors);
+            AppendInt(cvalues[3], Image.GoodSectors);
+            AppendInt(cvalues[4], Image.BadSectors);
+            cvalues[5].Append(Image.Modified ? yes : no);
         }
 
         public bool IsChanged()

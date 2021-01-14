@@ -24,13 +24,15 @@ namespace SpectrumArchiveReader
         private MList<ReaderBase> readers = new MList<ReaderBase>();
         private bool removeFunctionNameFromLog = false;
         private DiskReader diskReader;
-        private MList<TrackFormat> diskFormat;
         public static bool Dev;
+        public static bool Background;
 
         private HtTabPars htTabPars;
+        private CustomFormatTabPars customFormatTabPars;
 
         public class HtTabPars
         {
+            public Drive Drive;
             public DiskImage Image;
             public ImageStatsTable StatsTable;
             public Map Map;
@@ -100,6 +102,7 @@ namespace SpectrumArchiveReader
                 xml.WriteAttributeString("TrDosFileName", TrDosFileName);
                 xml.WriteAttributeString("CpmFileName", CpmFileName);
                 xml.WriteAttributeString("IsDosFileName", IsDosFileName);
+                xml.WriteAttributeString("Drive", Drive.ToString());
                 xml.WriteAttributeString("DataRate", DataRate.ToString());
                 xml.WriteAttributeString("TrDosChecked", TrDosChecked.ToString());
                 xml.WriteAttributeString("IsDosChecked", IsDosChecked.ToString());
@@ -125,6 +128,7 @@ namespace SpectrumArchiveReader
                 TrDosFileName = xml.GetAttribute("TrDosFileName");
                 CpmFileName = xml.GetAttribute("CpmFileName");
                 IsDosFileName = xml.GetAttribute("IsDosFileName");
+                Drive = (Drive)Enum.Parse(typeof(Drive), xml.GetAttribute("Drive"));
                 DataRate = (DataRate)Enum.Parse(typeof(DataRate), xml.GetAttribute("DataRate"));
                 TrDosChecked = bool.Parse(xml.GetAttribute("TrDosChecked"));
                 IsDosChecked = bool.Parse(xml.GetAttribute("IsDosChecked"));
@@ -134,6 +138,48 @@ namespace SpectrumArchiveReader
                 RandomReadTurnedOn = bool.Parse(xml.GetAttribute("RandomReadTurnedOn"));
                 RandomReadTimeout = TimeSpan.Parse(xml.GetAttribute("RandomReadTimeout"));
                 RandomReadStopOnNthFail = int.Parse(xml.GetAttribute("RandomReadStopOnNthFail"));
+            }
+        }
+
+        public class CustomFormatTabPars
+        {
+            public DiskImage2 Image;
+            public ImageStatsTable2 StatsTable;
+            public Map2 Map;
+            public DiskReader2 DiskReader;
+            public int SectorReadAttempts = 1;
+            public Drive Drive = Drive.A;
+            public DataRate DataRate = DataRate.FD_RATE_250K;
+            public DiskSide ReadSide = DiskSide.Both;
+            public ScanMode Scan = ScanMode.Once;
+            public bool Enabled = true;
+            public bool Processing;
+            public bool ParametersChanging;
+            public int FirstTrack;
+            public int LastTrack;
+
+            public void WriteToXml(XmlTextWriter xml, string name)
+            {
+                xml.WriteStartElement(name);
+                xml.WriteAttributeString("Drive", Drive.ToString());
+                xml.WriteAttributeString("DataRate", DataRate.ToString());
+                xml.WriteAttributeString("ReadSide", ReadSide.ToString());
+                xml.WriteAttributeString("SectorReadAttempts", SectorReadAttempts.ToString());
+                xml.WriteAttributeString("ScanMode", Scan.ToString());
+                xml.WriteAttributeString("FirstTrack", FirstTrack.ToString());
+                xml.WriteAttributeString("LastTrack", LastTrack.ToString());
+                xml.WriteEndElement();
+            }
+
+            public void ReadFromXml(XmlTextReader xml)
+            {
+                Drive = (Drive)Enum.Parse(typeof(Drive), xml.GetAttribute("Drive"));
+                DataRate = (DataRate)Enum.Parse(typeof(DataRate), xml.GetAttribute("DataRate"));
+                ReadSide = (DiskSide)Enum.Parse(typeof(DiskSide), xml.GetAttribute("ReadSide"));
+                SectorReadAttempts = int.Parse(xml.GetAttribute("SectorReadAttempts"));
+                Scan = (ScanMode)Enum.Parse(typeof(ScanMode), xml.GetAttribute("ScanMode"));
+                FirstTrack = int.Parse(xml.GetAttribute("FirstTrack"));
+                LastTrack = int.Parse(xml.GetAttribute("LastTrack"));
             }
         }
 
@@ -148,6 +194,8 @@ namespace SpectrumArchiveReader
             {
                 tabControl1.Controls.RemoveAt(1);
                 removeFunctionNameFromLog = true;
+                C_CfSaveFormat.Visible = false;
+                C_CfLoadFormat.Visible = false;
             }
             Log.MsgType fileAllowedMessages = 0;
             Log.MsgType windowAllowedMessages = Log.MsgType.Info | Log.MsgType.Warn | Log.MsgType.Error | Log.MsgType.Fatal;
@@ -163,6 +211,32 @@ namespace SpectrumArchiveReader
                 return;
             }
 
+            string bgKey = GetKeyStartingWith(args, "/bg");
+            // format: /bg_track_sectorNumber_sizeCode_head_dataRateAsInt
+            if (bgKey != null)
+            {
+                try
+                {
+                    Background = true;
+                    string[] elems = bgKey.Substring(4).Split('_');
+                    int track = int.Parse(elems[0]);
+                    int sectorNumber = int.Parse(elems[1]);
+                    int sizeCode = int.Parse(elems[2]);
+                    int head = int.Parse(elems[3]);
+                    DataRate dataRate = (DataRate)int.Parse(elems[4]);
+                    ReadInvisibleSector(track, sectorNumber, sizeCode, head, dataRate);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error?.Out($"Exception: {ex.Message} | Stack Trace: {ex.StackTrace}");
+                }
+                finally
+                {
+                    Environment.Exit(0);
+                }
+            }
+
             C_UIRefreshPeriod.SelectedIndex = 2;
 
             DiskReaderParams cpmParams = new DiskReaderParams()
@@ -171,7 +245,7 @@ namespace SpectrumArchiveReader
                 SectorReadAttempts = 1,
                 Side = DiskSide.Both,
                 UpperSideHead = UpperSideHead.Head1,
-                TrackTo = 172
+                LastTrack = 172
             };
             DiskReaderParams trDosParams = (DiskReaderParams)cpmParams.Clone();
             trDosParams.TrackLayoutAutodetect = true;
@@ -185,9 +259,28 @@ namespace SpectrumArchiveReader
             htTabPars.StatsTable.Repaint();
             htTabPars.Map = new Map(MaxTrack, 1024, 5, tabPage6, Color.White, htTabPars.StatsTable) { CanEditReadBounds = false };
             htTabPars.Map.SetPosition(0, 227);
-            htTabPars.Map.TrackFrom = 0;
-            htTabPars.Map.TrackTo = MaxTrack;
+            htTabPars.Map.FirstTrack = 0;
+            htTabPars.Map.LastTrack = MaxTrack;
             htTabPars.Map.Repaint();
+
+            customFormatTabPars = new CustomFormatTabPars();
+            customFormatTabPars.StatsTable = new ImageStatsTable2(tabPage7, SystemColors.Window, SystemColors.ControlText);
+            customFormatTabPars.StatsTable.SetPosition(tabPage7.Width - 290, 0);
+            customFormatTabPars.Image = new DiskImage2();
+            customFormatTabPars.StatsTable.Image = customFormatTabPars.Image;
+            customFormatTabPars.StatsTable.Repaint();
+            customFormatTabPars.Map = new Map2(172, customFormatTabPars.Image, tabPage7, SystemColors.Window, customFormatTabPars.StatsTable);
+            customFormatTabPars.Map.ReadBoundsChanged += Cf_Map_ReadBoundsChanged;
+            customFormatTabPars.Map.SetPosition(0, 80);
+            customFormatTabPars.Map.FirstTrack = 0;
+            customFormatTabPars.Map.LastTrack = MaxTrack;
+            customFormatTabPars.Map.Repaint();
+            C_CfDataRate.MouseWheel += C_CfDataRate_MouseWheel;
+            C_CfReadSide.MouseWheel += C_CfDataRate_MouseWheel;
+            C_CfScanMode.MouseWheel += C_CfDataRate_MouseWheel;
+            C_DataRate.MouseWheel += C_CfDataRate_MouseWheel;
+            C_HtDataRate.MouseWheel += C_CfDataRate_MouseWheel;
+
 
             try
             {
@@ -221,6 +314,10 @@ namespace SpectrumArchiveReader
                                 case "HT":
                                     htTabPars.ReadFromXml(xml);
                                     break;
+
+                                case "CustomFormat":
+                                    customFormatTabPars.ReadFromXml(xml);
+                                    break;
                             }
                         }
                     }
@@ -249,6 +346,19 @@ namespace SpectrumArchiveReader
 
             HtFillParameters();
             HtSetEnabled(HtReadParameters());
+            CfFillParameters();
+            CfSetEnabled(CfReadParameters());
+        }
+
+        private void C_CfDataRate_MouseWheel(object sender, MouseEventArgs e)
+        {
+            ((HandledMouseEventArgs)e).Handled = true;
+        }
+
+        private void Cf_Map_ReadBoundsChanged(object sender, EventArgs e)
+        {
+            customFormatTabPars.FirstTrack = customFormatTabPars.Map.FirstTrack;
+            customFormatTabPars.LastTrack = customFormatTabPars.Map.LastTrack;
         }
 
         private void MainForm_OperationCompleted(object sender, EventArgs e)
@@ -260,7 +370,9 @@ namespace SpectrumArchiveReader
                 readers[i].Enabled = true;
             }
             htTabPars.Enabled = true;
+            customFormatTabPars.Enabled = true;
             HtSetEnabled(true);
+            CfSetEnabled(true);
         }
 
         private void MainForm_OperationStarted(object sender, EventArgs e)
@@ -272,7 +384,9 @@ namespace SpectrumArchiveReader
                 if (readers[i] != sender) readers[i].Enabled = false;
             }
             if (sender != htTabPars) htTabPars.Enabled = false;
+            if (sender != customFormatTabPars) customFormatTabPars.Enabled = false;
             HtSetEnabled(true);
+            CfSetEnabled(true);
         }
 
         private bool ContainsKey(string[] args, string key)
@@ -414,11 +528,21 @@ namespace SpectrumArchiveReader
             {
                 readers[i].RefreshControls();
             }
-            HtRefreshControls();
+            if (htTabPars?.Image != null)
+            {
+                htTabPars.Map.Repaint();
+                htTabPars.StatsTable.Repaint();
+            }
+            if (customFormatTabPars?.Image != null)
+            {
+                customFormatTabPars.Map.Repaint();
+                customFormatTabPars.StatsTable.Repaint();
+            }
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (Background) return;
             for (int i = 0; i < readers.Cnt; i++)
             {
                 readers[i].Abort();
@@ -432,10 +556,14 @@ namespace SpectrumArchiveReader
                 xml.WriteAttributeString("TabIndex", tabControl1.SelectedIndex.ToString());
                 xml.WriteAttributeString("UIRefreshPeriod", C_UIRefreshPeriod.SelectedIndex.ToString());
                 xml.WriteEndElement();
-                readers[0].Params.SaveToXml(xml, "TR-DOS");
-                readers[1].Params.SaveToXml(xml, "CPM");
-                readers[2].Params.SaveToXml(xml, "IS-DOS");
-                htTabPars.WriteToXml(xml, "HT");
+                if (readers != null && readers.Cnt > 0)
+                {
+                    readers[0].Params.SaveToXml(xml, "TR-DOS");
+                    readers[1].Params.SaveToXml(xml, "CPM");
+                    readers[2].Params.SaveToXml(xml, "IS-DOS");
+                }
+                htTabPars?.WriteToXml(xml, "HT");
+                customFormatTabPars?.WriteToXml(xml, "CustomFormat");
                 xml.WriteEndElement();
                 xml.WriteEndDocument();
             }
@@ -491,11 +619,11 @@ namespace SpectrumArchiveReader
                     }
                     cat = cnt == 0 ? "N" : cnt.ToString();
                 }
-                sb.AppendLine(indent + indent + indent + $"<tr><td>{disk}</td><td>{image.Title}</td><td>{image.SizeTracks}</td><td>{image.GoodSectors}</td><td>{image.BadSectors}</td><td>{image.UnprocessedSectors}</td><td>{cat}</td><td>{image.Files.Cnt}/{image.DamagedFiles}</td><td>{image.NonZeroSectors}</td></tr>");
+                sb.AppendLine(indent + indent + indent + $"<tr><td>{disk}</td><td>{image.Title}</td><td>{image.SizeTracks}</td><td>{image.GoodSectors}</td><td>{image.NotGoodSectors}</td><td>{image.UnprocessedSectors}</td><td>{cat}</td><td>{image.Files.Cnt}/{image.DamagedFiles}</td><td>{image.NonZeroSectors}</td></tr>");
                 totalSectors += image.Sectors.Length >= 2560 ? image.Sectors.Length : 2560;
                 totalProcessedSectors += image.ProcessedSectors;
                 totalGoodSectors += image.GoodSectors;
-                totalBadSectors += image.BadSectors;
+                totalBadSectors += image.NotGoodSectors;
                 totalFiles += image.Files.Cnt;
                 totalDamagedFiles += image.DamagedFiles;
             }
@@ -591,13 +719,13 @@ namespace SpectrumArchiveReader
                 image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
-                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
+                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.NotGoodSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
                 jsArray.Append("\"" + image.GetSectorsAsString() + "\",");
                 if (image.GoodSectors == image.SizeSectors && image.SizeTracks >= 160) goodDisks++;
                 totalSectors += Math.Max(2560, image.Sectors.Length);
                 totalProcessedSectors += image.ProcessedSectors;
                 totalGoodSectors += image.GoodSectors;
-                totalBadSectors += image.BadSectors;
+                totalBadSectors += image.NotGoodSectors;
                 totalFiles += image.Files.Cnt;
                 totalDamagedFiles += image.DamagedFiles;
                 totalNonZeroSectors += image.NonZeroSectors;
@@ -606,7 +734,7 @@ namespace SpectrumArchiveReader
                     whollyProcessedDisks++;
                     sectorsFromWhollyProcessedDisks += image.SizeSectors;
                     goodSectorsFromWhollyProcessedDisks += image.GoodSectors;
-                    badSectorsFromWhollyProcessedDisks += image.BadSectors;
+                    badSectorsFromWhollyProcessedDisks += image.NotGoodSectors;
                 }
             }
             jsArray.Length--;
@@ -759,304 +887,586 @@ namespace SpectrumArchiveReader
             return r;
         }
 
+        private void ReadInvisibleSector(int track, int sectorNumber, int sizeCode, int head, DataRate dataRate)
+        {
+            IntPtr driverHandle = Driver.Open(dataRate, Drive.A);   // %%% [12.01.2021] Drive только A, надо будет переделать на произвольный.
+            IntPtr memoryHandle = Driver.VirtualAlloc(65536);
+            Driver.Seek(driverHandle, track);
+            Timer timer = new Timer();
+            Driver.WaitIndex(driverHandle);
+            timer.Start();
+            while (timer.ElapsedMs < 97.8) // 97.8
+            {
+
+            }
+            double beforeReset = timer.ElapsedMs;
+            Driver.Reset(driverHandle);
+            tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+            {
+                flags = Driver.FD_OPTION_MFM,
+                head = 0
+            };
+            tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+            //bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+
+            double beforeRead = timer.ElapsedMs;
+            int error = Driver.ReadSectorF(driverHandle, memoryHandle, track / 2, sectorNumber, sizeCode, (byte)(track & 1), head, 0x0a, 0xff);
+            timer.Stop();
+            Log.Info?.Out($"Error: {error}. sector: {result.sector}. time: {timer.ElapsedMs}. Before Reset: {beforeReset}. Before Read: {beforeRead}");
+            Driver.Close(driverHandle);
+            Thread.Sleep(1000);
+            Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+        }
+
+        private bool reposition = true;
+
         private void Test_Click(object sender, EventArgs e)
         {
-            using (XmlTextWriter xml = new XmlTextWriter(Path.ChangeExtension(Application.ExecutablePath, ".xml"), new UTF8Encoding()))
+            DataRate dataRatex = DataRate.FD_RATE_250K;
+            Drive drivex = Drive.A;
+            IntPtr driverHandlex = Driver.Open(dataRatex, drivex);
+            IntPtr memoryHandlex = Driver.VirtualAlloc(65536);
+
+
+            // Попытка прочитать невидимый сектор.
+            for (int i = 0; i < 1; i++)
             {
-                xml.Formatting = Formatting.Indented;
-                xml.WriteStartDocument();
-                xml.WriteStartElement("General");
-                xml.WriteStartElement("HT");
-                xml.WriteAttributeString("localname", "value");
-                xml.WriteEndElement();
-                xml.WriteEndElement();
-                xml.WriteEndDocument();
+                int trackx = 28;
+                if (reposition)
+                {
+                    Driver.Seek(driverHandlex, trackx);
+                    //reposition = false;
+                }
+                Timer timer = new Timer();
+                Driver.WaitIndex(driverHandlex);
+                timer.Start();
+                //while (timer.ElapsedMs < 203.1) // 97.8
+                //{
+
+                //}
+                while (timer.ElapsedMs < 98) // 97.8
+                {
+
+                }
+                Driver.Close(driverHandlex);
+                driverHandlex = Driver.Open(dataRatex, drivex);
+                //Driver.Seek(driverHandlex, trackx);
+                double seekTime = timer.ElapsedMs;
+                //while (timer.ElapsedMs < 97.8) // 97.8
+                //{
+
+                //}
+                double beforeReset = timer.ElapsedMs;
+                //Driver.Reset(driverHandlex);
+                //Log.Info?.Out($"time: {timer.ElapsedMs}");
+                //Thread.Sleep(203 * 10 + 5);
+                tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+                {
+                    flags = Driver.FD_OPTION_MFM,
+                    head = 0
+                };
+                tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+                //bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+
+                bool success = true;
+                double beforeRead = timer.ElapsedMs;
+                int error = Driver.ReadSectorF(driverHandlex, memoryHandlex, trackx / 2, 1, 1, (byte)(trackx & 1), 0, 0x0a, 0xff);
+
+                timer.Stop();
+                //int error = 0;
+                if (!success)
+                {
+                    error = Marshal.GetLastWin32Error();
+                }
+                Log.Info?.Out($"Error: {error}. sector: {result.sector}. seek time: {seekTime} time: {timer.ElapsedMs}. Before Reset: {beforeReset}. Before Read: {beforeRead}");
+                Application.DoEvents();
             }
+
+            // Попытка прочитать сектор сделав сброс контроллера.
+            //for (int i = 0; i < 1; i++)
+            //{
+            //    int trackx = 28;
+            //    if (reposition)
+            //    {
+            //        //Driver.Seek(driverHandlex, trackx);
+            //        reposition = false;
+            //    }
+            //    Timer timer = new Timer();
+            //    Driver.WaitIndex(driverHandlex);
+            //    timer.Start();
+            //    //Thread.Sleep(new TimeSpan(TimeSpan.TicksPerMillisecond * 96 + 4200));
+            //    //while (timer.ElapsedMs < 99.50)
+            //    while (timer.ElapsedMs < 97.8) // 97.8
+            //    {
+
+            //    }
+            //    double beforeReset = timer.ElapsedMs;
+            //    Driver.Reset(driverHandlex);
+            //    //Log.Info?.Out($"time: {timer.ElapsedMs}");
+            //    //Thread.Sleep(203 * 10 + 5);
+            //    tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+            //    {
+            //        flags = Driver.FD_OPTION_MFM,
+            //        head = 0
+            //    };
+            //    tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+            //    //bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+
+            //    bool success = true;
+            //    double beforeRead = timer.ElapsedMs;
+            //    int error = Driver.ReadSectorF(driverHandlex, memoryHandlex, trackx / 2, 1, 1, (byte)(trackx & 1), 0, 0x0a, 0xff);
+
+            //    timer.Stop();
+            //    //int error = 0;
+            //    if (!success)
+            //    {
+            //        error = Marshal.GetLastWin32Error();
+            //    }
+            //    Log.Info?.Out($"Error: {error}. sector: {result.sector}. time: {timer.ElapsedMs}. Before Reset: {beforeReset}. Before Read: {beforeRead}");
+            //    Application.DoEvents();
+            //}
+
+
+            //tagFD_INTERRUPT_STATUS interruptStatus;
+            //bool r = Driver.Recalibrate(h, out interruptStatus);
+            //bool r = Driver.SetHeadSettleTime(h, 5);
+            //Log.T?.OutI("result: " + r);
+            //byte result;
+            //Driver.GetPartId(h, out result);
+            //Log.T?.OutI(result.ToString());
+            //int time;
+            //bool r = Driver.GetTrackTime(h, out time);
+            //tagFD_CMD_RESULT result;
+            //Driver.GetResult(h, out result);
+            //Log.T?.OutI(result.st0.ToString());
+            //Driver.MotorOn(h);
+
+            //tagFD_SENSE_PARAMS senseParams = new tagFD_SENSE_PARAMS() { head = 1 };
+            //tagFD_DRIVE_STATUS driveStatus;
+            //bool r = Driver.SenseDriveStatus(driverHandlex, senseParams, out driveStatus);
+            //Log.Info?.Out($"result: {r} | Param: {driveStatus.st3} | WP={driveStatus.st3 & 0x40} | TR00={driveStatus.st3 & 0x10}");
+
+            //tagFD_DUMPREG_RESULT dump;
+            //bool r = Driver.DumpRegister(h, out dump);
+            //Log.T?.OutI(r.ToString());
+
+            // Определение времени между INDX и концом заголовка первого встретившегося сектора с вычислением статистики.
+            //int trackx = 68;
+            //Driver.Seek(driverHandlex, trackx);
+            //MList<double> times = new MList<double>();
+            //for (int i = 0; i < 100; i++)
+            //{
+            //    Driver.WaitIndex(driverHandlex);
+            //    Timer timer = Timer.StartNew();
+            //    tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+            //    {
+            //        flags = Driver.FD_OPTION_MFM,
+            //        head = 0
+            //    };
+            //    tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+            //    bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+            //    timer.Stop();
+            //    int error = 0;
+            //    if (!success)
+            //    {
+            //        error = Marshal.GetLastWin32Error();
+            //    }
+            //    Log.Info?.Out($"Error: {error}. sector: {result.sector}. Time: {timer.ElapsedMs.ToString()}");
+            //    if (i > 0) times.Add(timer.ElapsedMs);
+            //    Application.DoEvents();
+            //}
+            //double expVal = 0;
+            //for (int i = 0; i < times.Cnt; i++)
+            //{
+            //    expVal += times[i];
+            //}
+            //expVal /= times.Cnt;
+            //double stDev = 0;
+            //double mae = 0;
+            //for (int i = 0; i < times.Cnt; i++)
+            //{
+            //    stDev += (expVal - times[i]) * (expVal - times[i]);
+            //    mae += Math.Abs(expVal - times[i]);
+            //}
+            //stDev = Math.Sqrt(stDev / times.Cnt);
+            //mae /= times.Cnt;
+            //Log.Info?.Out($"ExpVal: {expVal}, StDev: {stDev}, MAE={mae}");
+
+            // Определение времени между INDX и концом данных сектора.
+            //int trackx = 68;
+            //if (reposition)
+            //{
+            //    Driver.Seek(driverHandlex, trackx);
+            //    reposition = false;
+            //}
+            //Driver.WaitIndex(driverHandlex);
+            //Timer timer = Timer.StartNew();
+            //int error = Driver.ReadSectorF(driverHandlex, memoryHandlex, trackx / 2, 2, 1, trackx % 1, 0, 0x0a, 0xff);
+            //timer.Stop();
+            //Log.Info?.Out($"Error: {error}. Time: {timer.ElapsedMs.ToString()}");
+
+            // Определение времени между INDX и концом заголовка первого встретившегося сектора.
+            //int trackx = 159;
+            //if (reposition)
+            //{
+            //    Driver.Seek(driverHandlex, trackx);
+            //    reposition = false;
+            //}
+            //Driver.WaitIndex(driverHandlex);
+            //Timer timer = Timer.StartNew();
+            //tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+            //{
+            //    flags = Driver.FD_OPTION_MFM,
+            //    head = 0
+            //};
+            //tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+            //bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+            //timer.Stop();
+            //int error = 0;
+            //if (!success)
+            //{
+            //    error = Marshal.GetLastWin32Error();
+            //}
+            //Log.Info?.Out($"Error: {error}. sector: {result.sector}. Time: {timer.ElapsedMs.ToString()}");
+
+
+
+            // Попытка прочитать сектор подождав несколько оборотов.
+            //int trackx = 28;
+            //Driver.Seek(driverHandlex, trackx);
+            //Driver.WaitIndex(driverHandlex);
+            //for (int u = 0; u < 30; u++)
+            //{
+            //    Driver.Seek(driverHandlex, trackx);
+            //}
+            //Thread.Sleep(203 * 10 + 5);
+            //tagFD_READ_ID_PARAMS readIdParams = new tagFD_READ_ID_PARAMS()
+            //{
+            //    flags = Driver.FD_OPTION_MFM,
+            //    head = 0
+            //};
+            //tagFD_CMD_RESULT result = new tagFD_CMD_RESULT();
+            //bool success = Driver.ReadId(driverHandlex, readIdParams, out result);
+            //int error = 0;
+            //if (!success)
+            //{
+            //    error = Marshal.GetLastWin32Error();
+            //}
+            //Log.Info?.Out($"Error: {error}. sector: {result.sector}");
+
+            // Raw-дамп трека.
+            //int trackx = 68;
+            //Driver.Seek(driverHandlex, trackx);
+            //int errorx = Driver.ReadTrack(driverHandlex, memoryHandlex, trackx, 1);
+            //Log.Info?.Out($"Error: {errorx}");
+            //byte[] d = new byte[65536];
+            //Marshal.Copy(memoryHandlex, d, 0, 65536);
+            //string fileName = @"D:\GD\Projects\SpectrumArchiveReader\SpectrumArchiveReader\bin\Debug\trackDump.bin";
+            //File.WriteAllBytes(fileName, d);
+
+            Driver.Close(driverHandlex);
+            Driver.VirtualFree(memoryHandlex, 0, Driver.AllocationType.Release);
             return;
 
-            OpenFileDialog openDialog = new OpenFileDialog();
-            if (openDialog.ShowDialog() != DialogResult.OK) return;
-            TrDosImage image = new TrDosImage();
-            int result = image.LoadAutodetect(openDialog.FileName);
-            int attemptCount = 50;
-            //int track = 65;
-            //int sector = 11;
+            // Чтение сектора (по сути всего трека) с диска D090.
+            //DataRate dataRatex = DataRate.FD_RATE_250K;
+            //IntPtr driverHandlex = Driver.Open(dataRatex);
+            //int trackx = 162;
+            //Driver.Seek(driverHandlex, trackx);
+            //int fileSize = 65536;
+            //IntPtr memoryHandlex = Driver.VirtualAlloc(fileSize);
+            ////int errorx = Driver.ReadSectorF(driverHandlex, memoryHandlex, 81, 7, 6, 0, 0, 0x0a, 0xff);
+            //int errorx = Driver.ReadSectorF(driverHandlex, memoryHandlex, 81, 10, 9, 0, 0, 0x0a, 0xff);
+            //Log.Info?.Out($"Error: {errorx}");
+            //string fileName = @"D:\GD\Projects\SpectrumArchiveReader\SpectrumArchiveReader\bin\Debug\dump.bin";
+            //byte[] file = new byte[fileSize];
+            //Marshal.Copy(memoryHandlex, file, 0, fileSize);
+            //File.WriteAllBytes(fileName, file);
+            //return;
 
-            // D028:
-            int track = 121;
-            int sector = 15;
+            //OpenFileDialog openDialog = new OpenFileDialog();
+            //if (openDialog.ShowDialog() != DialogResult.OK) return;
+            //TrDosImage image = new TrDosImage();
+            //int result = image.LoadAutodetect(openDialog.FileName);
+            //int attemptCount = 50;
+            ////int track = 65;
+            ////int sector = 11;
 
-            //int sectorNum = track * 16 + sector - 931;  // for D009 DISAB-17.
-            int sectorNum = track * 16 + sector;
-            int adr = sectorNum * 256;
-            DataRate dataRate = DataRate.FD_RATE_250K;
-            IntPtr driverHandle = Driver.Open(dataRate);
-            Driver.Seek(driverHandle, track);
-            IntPtr memoryHandle = Driver.VirtualAlloc(256);
-            int[] stats = new int[256 * 8];
-            MList<byte[]> blocks = new MList<byte[]>();
-            byte[] array = new byte[256];
-            byte[] array1 = new byte[256];
-            byte[] original = new byte[256];
-            Array.Copy(image.Data, adr, original, 0, 256);
-            int si;
-            int error23Cnt = 0;
-            int mismatchCntr;
-            int mismatchBitCntr;
-            for (int i = 0; i < attemptCount; i++)
-            {
-                int error = Driver.ReadSector(driverHandle, memoryHandle, track, sector + 1, UpperSideHead.Head0, 1);
-                Application.DoEvents();
-                if (error == 0)
-                {
-                    Log.Info?.Out($"Сектор прочитался успешно. Попытка: {i}");
-                    continue;
-                }
-                if (error != 23)
-                {
-                    Log.Info?.Out($"Ошибка не 23: {error}");
-                    continue;
-                }
-                Marshal.Copy(memoryHandle, array, 0, 256);
-                mismatchCntr = 0;
-                mismatchBitCntr = 0;
-                for (int t = 0; t < 256; t++)
-                {
-                    if (image.Data[adr + t] != array[t])
-                    {
-                        mismatchCntr++;
-                        int mask = 1;
-                        for (int m = 0; m < 8; m++)
-                        {
-                            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
-                        }
-                    }
-                }
-                Log.Info?.Out($"Попытка: {i}. Error: {error}. Mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
-                byte[] newarray = new byte[256];
-                array.CopyTo(newarray, 0);
-                blocks.Add(newarray);
-                error23Cnt++;
-                //si = 0;
-                //for (int c = 0; c < 256; c++)
-                //{
-                //    int mask = 1;
-                //    for (int m = 0; m < 8; m++)
-                //    {
-                //        if ((array[c] & (mask << m)) != 0) stats[si]++;
-                //        si++;
-                //    }
-                //}
-            }
-            Log.Info?.Out($"error23cnt: {error23Cnt}");
+            //// D028:
+            //int track = 121;
+            //int sector = 15;
 
-            if (error23Cnt == 0)
-            {
-                Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
-                Driver.Close(driverHandle);
-                return;
-            }
-            MList<byte[]> cluster1 = new MList<byte[]>();
-            MList<byte[]> cluster2 = new MList<byte[]>();
-            cluster1.Add(blocks[0]);
-            for (int i = 1; i < blocks.Cnt; i++)
-            {
-                mismatchCntr = 0;
-                for (int t = 0; t < 256; t++)
-                {
-                    if (blocks[i][t] != blocks[0][t]) mismatchCntr++;
-                }
-                if (mismatchCntr < 50)
-                {
-                    cluster1.Add(blocks[i]);
-                }
-                else
-                {
-                    cluster2.Add(blocks[i]);
-                }
-            }
-            Log.Info?.Out($"Cluster1: {cluster1.Cnt}. Cluster2: {cluster2.Cnt}");
+            ////int sectorNum = track * 16 + sector - 931;  // for D009 DISAB-17.
+            //int sectorNum = track * 16 + sector;
+            //int adr = sectorNum * 256;
+            //DataRate dataRate = DataRate.FD_RATE_250K;
+            //IntPtr driverHandle = Driver.Open(dataRate);
+            //Driver.Seek(driverHandle, track);
+            //IntPtr memoryHandle = Driver.VirtualAlloc(256);
+            //int[] stats = new int[256 * 8];
+            //MList<byte[]> blocks = new MList<byte[]>();
+            //byte[] array = new byte[256];
+            //byte[] array1 = new byte[256];
+            //byte[] original = new byte[256];
+            //Array.Copy(image.Data, adr, original, 0, 256);
+            //int si;
+            //int error23Cnt = 0;
+            //int mismatchCntr;
+            //int mismatchBitCntr;
+            //for (int i = 0; i < attemptCount; i++)
+            //{
+            //    int error = Driver.ReadSector(driverHandle, memoryHandle, track, sector + 1, UpperSideHead.Head0, 1);
+            //    Application.DoEvents();
+            //    if (error == 0)
+            //    {
+            //        Log.Info?.Out($"Сектор прочитался успешно. Попытка: {i}");
+            //        continue;
+            //    }
+            //    if (error != 23)
+            //    {
+            //        Log.Info?.Out($"Ошибка не 23: {error}");
+            //        continue;
+            //    }
+            //    Marshal.Copy(memoryHandle, array, 0, 256);
+            //    mismatchCntr = 0;
+            //    mismatchBitCntr = 0;
+            //    for (int t = 0; t < 256; t++)
+            //    {
+            //        if (image.Data[adr + t] != array[t])
+            //        {
+            //            mismatchCntr++;
+            //            int mask = 1;
+            //            for (int m = 0; m < 8; m++)
+            //            {
+            //                if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+            //            }
+            //        }
+            //    }
+            //    Log.Info?.Out($"Попытка: {i}. Error: {error}. Mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+            //    byte[] newarray = new byte[256];
+            //    array.CopyTo(newarray, 0);
+            //    blocks.Add(newarray);
+            //    error23Cnt++;
+            //    //si = 0;
+            //    //for (int c = 0; c < 256; c++)
+            //    //{
+            //    //    int mask = 1;
+            //    //    for (int m = 0; m < 8; m++)
+            //    //    {
+            //    //        if ((array[c] & (mask << m)) != 0) stats[si]++;
+            //    //        si++;
+            //    //    }
+            //    //}
+            //}
+            //Log.Info?.Out($"error23cnt: {error23Cnt}");
 
-            // cluster1
+            //if (error23Cnt == 0)
+            //{
+            //    Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+            //    Driver.Close(driverHandle);
+            //    return;
+            //}
+            //MList<byte[]> cluster1 = new MList<byte[]>();
+            //MList<byte[]> cluster2 = new MList<byte[]>();
+            //cluster1.Add(blocks[0]);
+            //for (int i = 1; i < blocks.Cnt; i++)
+            //{
+            //    mismatchCntr = 0;
+            //    for (int t = 0; t < 256; t++)
+            //    {
+            //        if (blocks[i][t] != blocks[0][t]) mismatchCntr++;
+            //    }
+            //    if (mismatchCntr < 50)
+            //    {
+            //        cluster1.Add(blocks[i]);
+            //    }
+            //    else
+            //    {
+            //        cluster2.Add(blocks[i]);
+            //    }
+            //}
+            //Log.Info?.Out($"Cluster1: {cluster1.Cnt}. Cluster2: {cluster2.Cnt}");
 
-            for (int i = 0; i < cluster1.Cnt; i++)
-            {
-                si = 0;
-                for (int c = 0; c < 256; c++)
-                {
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((cluster1[i][c] & (mask << m)) != 0) stats[si]++;
-                        si++;
-                    }
-                }
-            }
-            si = 0;
-            for (int i = 0; i < 256; i++)
-            {
-                byte resByte = 0;
-                for (int m = 0; m < 8; m++)
-                {
-                    int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
-                    resByte |= (byte)(value << m);
-                    si++;
-                }
-                array[i] = resByte;
-            }
-            mismatchCntr = 0;
-            mismatchBitCntr = 0;
-            for (int t = 0; t < 256; t++)
-            {
-                if (image.Data[adr + t] != array[t])
-                {
-                    mismatchCntr++;
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
-                    }
-                }
-                array1[t] = (byte)(image.Data[adr + t] - array[t]);
-            }
-            Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+            //// cluster1
 
-            // cluster2
+            //for (int i = 0; i < cluster1.Cnt; i++)
+            //{
+            //    si = 0;
+            //    for (int c = 0; c < 256; c++)
+            //    {
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((cluster1[i][c] & (mask << m)) != 0) stats[si]++;
+            //            si++;
+            //        }
+            //    }
+            //}
+            //si = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    byte resByte = 0;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
+            //        resByte |= (byte)(value << m);
+            //        si++;
+            //    }
+            //    array[i] = resByte;
+            //}
+            //mismatchCntr = 0;
+            //mismatchBitCntr = 0;
+            //for (int t = 0; t < 256; t++)
+            //{
+            //    if (image.Data[adr + t] != array[t])
+            //    {
+            //        mismatchCntr++;
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+            //        }
+            //    }
+            //    array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            //}
+            //Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
 
-            Array.Clear(stats, 0, stats.Length);
-            for (int i = 0; i < cluster2.Cnt; i++)
-            {
-                si = 0;
-                for (int c = 0; c < 256; c++)
-                {
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((cluster2[i][c] & (mask << m)) != 0) stats[si]++;
-                        si++;
-                    }
-                }
-            }
-            si = 0;
-            for (int i = 0; i < 256; i++)
-            {
-                byte resByte = 0;
-                for (int m = 0; m < 8; m++)
-                {
-                    int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
-                    resByte |= (byte)(value << m);
-                    si++;
-                }
-                array[i] = resByte;
-            }
-            mismatchCntr = 0;
-            mismatchBitCntr = 0;
-            for (int t = 0; t < 256; t++)
-            {
-                if (image.Data[adr + t] != array[t])
-                {
-                    mismatchCntr++;
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
-                    }
-                }
-                array1[t] = (byte)(image.Data[adr + t] - array[t]);
-            }
-            Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+            //// cluster2
 
-            // cluster1 MFM-sync
+            //Array.Clear(stats, 0, stats.Length);
+            //for (int i = 0; i < cluster2.Cnt; i++)
+            //{
+            //    si = 0;
+            //    for (int c = 0; c < 256; c++)
+            //    {
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((cluster2[i][c] & (mask << m)) != 0) stats[si]++;
+            //            si++;
+            //        }
+            //    }
+            //}
+            //si = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    byte resByte = 0;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
+            //        resByte |= (byte)(value << m);
+            //        si++;
+            //    }
+            //    array[i] = resByte;
+            //}
+            //mismatchCntr = 0;
+            //mismatchBitCntr = 0;
+            //for (int t = 0; t < 256; t++)
+            //{
+            //    if (image.Data[adr + t] != array[t])
+            //    {
+            //        mismatchCntr++;
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+            //        }
+            //    }
+            //    array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            //}
+            //Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
 
-            Array.Clear(stats, 0, stats.Length);
-            for (int i = 0; i < cluster1.Cnt; i++)
-            {
-                si = 0;
-                byte[] mfmSync = GetMfmSyncArray(cluster1[i]);
-                for (int c = 0; c < 256; c++)
-                {
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
-                        si++;
-                    }
-                }
-            }
-            si = 0;
-            for (int i = 0; i < 256; i++)
-            {
-                byte resByte = 0;
-                for (int m = 0; m < 8; m++)
-                {
-                    int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
-                    resByte |= (byte)(value << m);
-                    si++;
-                }
-                array[i] = resByte;
-            }
-            mismatchCntr = 0;
-            mismatchBitCntr = 0;
-            for (int t = 0; t < 256; t++)
-            {
-                if (image.Data[adr + t] != array[t])
-                {
-                    mismatchCntr++;
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
-                    }
-                }
-                array1[t] = (byte)(image.Data[adr + t] - array[t]);
-            }
-            Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+            //// cluster1 MFM-sync
 
-            // cluster2 MFM-Sync
+            //Array.Clear(stats, 0, stats.Length);
+            //for (int i = 0; i < cluster1.Cnt; i++)
+            //{
+            //    si = 0;
+            //    byte[] mfmSync = GetMfmSyncArray(cluster1[i]);
+            //    for (int c = 0; c < 256; c++)
+            //    {
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
+            //            si++;
+            //        }
+            //    }
+            //}
+            //si = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    byte resByte = 0;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int value = stats[si] > cluster1.Cnt / 2 ? 1 : 0;
+            //        resByte |= (byte)(value << m);
+            //        si++;
+            //    }
+            //    array[i] = resByte;
+            //}
+            //mismatchCntr = 0;
+            //mismatchBitCntr = 0;
+            //for (int t = 0; t < 256; t++)
+            //{
+            //    if (image.Data[adr + t] != array[t])
+            //    {
+            //        mismatchCntr++;
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+            //        }
+            //    }
+            //    array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            //}
+            //Log.Info?.Out($"Cluster1 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
 
-            Array.Clear(stats, 0, stats.Length);
-            for (int i = 0; i < cluster2.Cnt; i++)
-            {
-                si = 0;
-                byte[] mfmSync = GetMfmSyncArray(cluster2[i]);
-                for (int c = 0; c < 256; c++)
-                {
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
-                        si++;
-                    }
-                }
-            }
-            si = 0;
-            for (int i = 0; i < 256; i++)
-            {
-                byte resByte = 0;
-                for (int m = 0; m < 8; m++)
-                {
-                    int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
-                    resByte |= (byte)(value << m);
-                    si++;
-                }
-                array[i] = resByte;
-            }
-            mismatchCntr = 0;
-            mismatchBitCntr = 0;
-            for (int t = 0; t < 256; t++)
-            {
-                if (image.Data[adr + t] != array[t])
-                {
-                    mismatchCntr++;
-                    int mask = 1;
-                    for (int m = 0; m < 8; m++)
-                    {
-                        if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
-                    }
-                }
-                array1[t] = (byte)(image.Data[adr + t] - array[t]);
-            }
-            Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
+            //// cluster2 MFM-Sync
+
+            //Array.Clear(stats, 0, stats.Length);
+            //for (int i = 0; i < cluster2.Cnt; i++)
+            //{
+            //    si = 0;
+            //    byte[] mfmSync = GetMfmSyncArray(cluster2[i]);
+            //    for (int c = 0; c < 256; c++)
+            //    {
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((mfmSync[c] & (mask << m)) != 0) stats[si]++;
+            //            si++;
+            //        }
+            //    }
+            //}
+            //si = 0;
+            //for (int i = 0; i < 256; i++)
+            //{
+            //    byte resByte = 0;
+            //    for (int m = 0; m < 8; m++)
+            //    {
+            //        int value = stats[si] > cluster2.Cnt / 2 ? 1 : 0;
+            //        resByte |= (byte)(value << m);
+            //        si++;
+            //    }
+            //    array[i] = resByte;
+            //}
+            //mismatchCntr = 0;
+            //mismatchBitCntr = 0;
+            //for (int t = 0; t < 256; t++)
+            //{
+            //    if (image.Data[adr + t] != array[t])
+            //    {
+            //        mismatchCntr++;
+            //        int mask = 1;
+            //        for (int m = 0; m < 8; m++)
+            //        {
+            //            if ((image.Data[adr + t] & (mask << m)) != (array[t] & (mask << m))) mismatchBitCntr++;
+            //        }
+            //    }
+            //    array1[t] = (byte)(image.Data[adr + t] - array[t]);
+            //}
+            //Log.Info?.Out($"Cluster2 mismatched bytes: {mismatchCntr}, bits: {mismatchBitCntr}");
 
             //si = 0;
             //for (int i = 0; i < 256; i++)
@@ -1076,9 +1486,9 @@ namespace SpectrumArchiveReader
             //    if (image.Data[adr + i] != array[i]) mismatchCntr++;
             //}
             //Log.Info?.Out($"Несовпадающие байты: {mismatchCntr}");
-            Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
-            Driver.Close(driverHandle);
-            return;
+            //Driver.VirtualFree(memoryHandle, 0, Driver.AllocationType.Release);
+            //Driver.Close(driverHandle);
+            //return;
 
             //OpenFileDialog openDialog = new OpenFileDialog();
             //if (openDialog.ShowDialog() != DialogResult.OK) return;
@@ -1440,29 +1850,6 @@ namespace SpectrumArchiveReader
             //    Log.T?.OutI($"st0={cmdResult.st0} st1={cmdResult.st1} st2={cmdResult.st2} cyl={cmdResult.cyl} head={cmdResult.head} sector={cmdResult.sector} size={cmdResult.size}");
             //}
 
-            //tagFD_INTERRUPT_STATUS interruptStatus;
-            //bool r = Driver.Recalibrate(h, out interruptStatus);
-            //bool r = Driver.SetHeadSettleTime(h, 5);
-            //Log.T?.OutI("result: " + r);
-            //byte result;
-            //Driver.GetPartId(h, out result);
-            //Log.T?.OutI(result.ToString());
-            //int time;
-            //bool r = Driver.GetTrackTime(h, out time);
-            //tagFD_CMD_RESULT result;
-            //Driver.GetResult(h, out result);
-            //Log.T?.OutI(result.st0.ToString());
-            //Driver.MotorOn(h);
-
-            //tagFD_SENSE_PARAMS senseParams = new tagFD_SENSE_PARAMS() { head = 1 };
-            //tagFD_DRIVE_STATUS driveStatus;
-            //bool r = Driver.SenseDriveStatus(h, senseParams, out driveStatus);
-            //Log.T?.OutI($"result: {r} | Param: {driveStatus.st3} | WP={driveStatus.st3 & 0x40} | TR00={driveStatus.st3 & 0x10}");
-
-            //tagFD_DUMPREG_RESULT dump;
-            //bool r = Driver.DumpRegister(h, out dump);
-            //Log.T?.OutI(r.ToString());
-
             //int time;
             //bool r = Driver.GetTrackTime(h, out time);
             //Log.T?.OutI("time=" + time + " result: " + r);
@@ -1776,7 +2163,7 @@ namespace SpectrumArchiveReader
                 image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
-                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
+                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.NotGoodSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
                 jsArray.Append("\"" + image.BuildAdjacentSectorsDuplicateSectorsMap(16) + "\",");
             }
             jsArray.Length--;
@@ -1814,7 +2201,7 @@ namespace SpectrumArchiveReader
                 image.LoadAutodetect(files[i]);
                 image.ParseCatalogue();
                 string disk = image.FileNameOnly.Substring(0, 4);
-                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.BadSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
+                values.Append($"[\"{Path.GetFileNameWithoutExtension(image.FileNameOnly)}\",\"{(image.Title == null ? "" : image.Title.Trim('\0', ' '))}\",{image.SizeTracks},{image.GoodSectors},{image.NotGoodSectors},{image.UnprocessedSectors},{image.Files.Cnt},{image.DamagedFiles},{image.NonZeroSectors}],");
                 jsArray.Append("\"" + image.BuildSectorContentMap() + "\",");
             }
             jsArray.Length--;
@@ -1860,9 +2247,9 @@ namespace SpectrumArchiveReader
             //Log.I?.Out($"Измерение скорости вращения диска. Disk Format: {settings.DiskFormat}. Side: {settings.ReadSide}. DataRate: {settings.DataRate}. Track: {settings.RotationSpeedTrack}. Sector: {settings.RotationSpeedSector}. HighResolution: {Stopwatch.IsHighResolution}.");
             Log.Info?.Out($"Измерение скорости вращения диска. Disk Format: {UpperSideHead.Head0}. Side: {DiskSide.Both}. DataRate: {DataRate.FD_RATE_250K}. Track: {10}. Sector: {1}. HighResolution: {Timer.IsHighResolution}.");
             BackgroundWorker worker = new BackgroundWorker();
-            int RotationSpeedCount = 100;
-            int RotationSpeedTrack = 10;
-            int RotationSpeedSector = 1;
+            int RotationSpeedCount = 5;
+            int RotationSpeedTrack = 68;
+            int RotationSpeedSector = 2;
             worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
             {
                 IntPtr driverHandle = IntPtr.Zero;
@@ -1870,15 +2257,15 @@ namespace SpectrumArchiveReader
                 {
                     //aborted = false;
                     //driverHandle = Driver.Open(settings.DataRate);
-                    driverHandle = Driver.Open(DataRate.FD_RATE_250K);
+                    driverHandle = Driver.Open(DataRate.FD_RATE_250K, Drive.A);
                     if ((int)driverHandle == Driver.INVALID_HANDLE_VALUE) return;
-                    IntPtr memoryHandle = Driver.VirtualAlloc(256);
+                    IntPtr memoryHandle = Driver.VirtualAlloc(65536);
                     if (memoryHandle == IntPtr.Zero) return;
                     //MList<TimeSpan> values = new MList<TimeSpan>(settings.RotationSpeedCount);
                     MList<TimeSpan> values = new MList<TimeSpan>(RotationSpeedCount);
                     //int error = Driver.ReadSectorWithSeek(driverHandle, memoryHandle, settings.RotationSpeedTrack, settings.RotationSpeedSector, settings.DiskFormat, true);
                     Driver.Seek(driverHandle, RotationSpeedTrack);
-                    int error = Driver.ReadSector(driverHandle, memoryHandle, RotationSpeedTrack, 1, UpperSideHead.Head0, 1);
+                    int error = Driver.ReadSector(driverHandle, memoryHandle, RotationSpeedTrack, RotationSpeedSector, UpperSideHead.Head0, 1);
                     Timer pc = Timer.StartNew();
                     Timer pcTotal = Timer.StartNew();
                     for (int i = 0; i < RotationSpeedCount; i++)
@@ -2022,59 +2409,22 @@ namespace SpectrumArchiveReader
 
         private void C_ScanDisk_Click(object sender, EventArgs e)
         {
-            TrDosReader reader = (TrDosReader)readers[0];
-            if (!reader.ReadParameters(false)) return;
-            Log.Info?.Out($"Сканирование формата диска. DataRate: {reader.Params.DataRate}");
-            C_Abort.Enabled = true;
-            diskReader = new DiskReader((DiskReaderParams)reader.Params.Clone());
-            BackgroundWorker worker = new BackgroundWorker();
-            worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
-            {
-                try
-                {
-                    diskReader.OpenDriver();
-                    diskReader.ScanDiskFormat(diskFormat);
-                    diskReader.CloseDriver();
-                    Log.Info?.Out($"Найдено секторов: {TrackFormat.TotalSectors(diskFormat)}");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error?.Out($"Исключение при сканировании диска: {ex.Message} | StackTrace: {ex.StackTrace}");
-                }
-            };
-            worker.RunWorkerCompleted += (object sender1, RunWorkerCompletedEventArgs ee) =>
-            {
-                C_Abort.Enabled = false;
-            };
-            worker.RunWorkerAsync();
+
         }
 
         private void C_SaveDiskFormat_Click(object sender, EventArgs e)
         {
-            if (diskFormat == null) return;
-            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "Xml Files (*.xml)|*.xml|All Files (*.*)|*.*" };
-            saveDialog.FileName = "Disk Format";
-            if (saveDialog.ShowDialog() != DialogResult.OK) return;
-            File.WriteAllText(saveDialog.FileName, TrackFormat.ToXml(diskFormat));
+            
         }
 
         private void C_NewDiskFormat_Click(object sender, EventArgs e)
         {
-            diskFormat = new MList<TrackFormat>(172);
-            for (int i = 0; i < 172; i++)
-            {
-                diskFormat.Add(new TrackFormat(55));
-            }
+            
         }
 
         private void C_LoadDiskFormat_Click(object sender, EventArgs e)
         {
-            OpenFileDialog openDialog = new OpenFileDialog()
-            {
-                Filter = "Xml Files (*.xml)|*.xml|All Files (*.*)|*.*"
-            };
-            if (openDialog.ShowDialog() != DialogResult.OK) return;
-            diskFormat = TrackFormat.LoadXml(openDialog.FileName);
+            
         }
 
         private void C_UIRefreshPeriod_SelectedIndexChanged(object sender, EventArgs e)
@@ -2084,7 +2434,7 @@ namespace SpectrumArchiveReader
 
         private void C_Abort_Click(object sender, EventArgs e)
         {
-            if (diskReader != null) diskReader.Aborted = true;
+            
         }
 
         private string GetPattern(string fileName, out int numLen)
@@ -2120,23 +2470,24 @@ namespace SpectrumArchiveReader
                     htTabPars.StatsTable.Image = null;
                     htTabPars.Params = new DiskReaderParams()
                     {
+                        Drive = htTabPars.Drive,
                         DataRate = htTabPars.DataRate,
-                        SectorNumFrom = 0,
+                        FirstSectorNum = 0,
                         SectorReadAttempts = htTabPars.SectorReadAttempts,
                         Side = DiskSide.Both,
-                        TrackFrom = 0,
-                        TrackTo = htTabPars.MaxTracks,
+                        FirstTrack = 0,
+                        LastTrack = htTabPars.MaxTracks,
                         UpperSideHead = UpperSideHead.Head1
                     };
 
                     diskReader = new DiskReader(htTabPars.Params);
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     bool formatIdentified = false;
                     for (int i = 0; i < 3; i++)
                     {
                         Driver.Recalibrate(diskReader.DriverHandle);
                         bool scanResult = diskReader.ScanFormat(htTabPars.Track0Format, 0, true);
-                        if (diskReader.Aborted) goto abort;
+                        if (diskReader.Aborted) return;
                         Log.Info?.Out($"Формат 0 трека: {htTabPars.Track0Format.FormatName} | {htTabPars.Track0Format.Layout.Cnt} sectors | {htTabPars.Track0Format.ToStringAsSectorArray()}");
                         if (htTabPars.Track0Format.DoesSatisfyFormat(TrackFormat.TrDos, 0))
                         {
@@ -2149,7 +2500,7 @@ namespace SpectrumArchiveReader
                             else
                             {
                                 Log.Info?.Out($"Detected as TR-DOS.");
-                                goto abort;
+                                return;
                             }
                         }
                         else if (htTabPars.Track0Format.FormatName >= TrackFormatName.CpmSequential && htTabPars.Track0Format.FormatName <= TrackFormatName.CpmGeneric)
@@ -2163,7 +2514,7 @@ namespace SpectrumArchiveReader
                             else
                             {
                                 Log.Info?.Out($"Detected as CP/M.");
-                                goto abort;
+                                return;
                             }
                         }
                         else if (htTabPars.Track0Format.FormatName >= TrackFormatName.IsDosSequential && htTabPars.Track0Format.FormatName <= TrackFormatName.IsDosGeneric)
@@ -2177,7 +2528,7 @@ namespace SpectrumArchiveReader
                             else
                             {
                                 Log.Info?.Out($"Detected as IS-DOS.");
-                                goto abort;
+                                return;
                             }
                         }
                         else
@@ -2190,12 +2541,12 @@ namespace SpectrumArchiveReader
                     if (htTabPars.Track0Format.Layout.Cnt == 0)
                     {
                         Log.Info?.Out($"На нулевом треке заголовки секторов не обнаружены.");
-                        goto abort;
+                        return;
                     }
                     else if (!formatIdentified)
                     {
                         Log.Info?.Out($"Формат не поддерживается или диск имеет ошибки на нулевом треке.");
-                        goto abort;
+                        return;
                     }
                     htTabPars.Map.Image = htTabPars.Image;
                     htTabPars.StatsTable.Image = htTabPars.Image;
@@ -2207,13 +2558,14 @@ namespace SpectrumArchiveReader
                     htTabPars.Params.Image = htTabPars.Image;
                     HtRead(false);
                     if (!diskReader.Aborted) HtSave();
-                    return;
-                    abort:
-                    diskReader.CloseDriver();
                 }
                 catch (Exception ex)
                 {
                     Log.Error?.Out($"Исключение: {ex.Message} | StackTrace: {ex.StackTrace}");
+                }
+                finally
+                {
+                    diskReader.CloseDriver();
                 }
             };
             worker.RunWorkerCompleted += (object sender1, RunWorkerCompletedEventArgs ee) =>
@@ -2238,9 +2590,10 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
+                    htTabPars.Params.Drive = htTabPars.Drive;
                     htTabPars.Params.DataRate = htTabPars.DataRate;
                     htTabPars.Params.SectorReadAttempts = htTabPars.SectorReadAttempts;
-                    htTabPars.Params.TrackTo = htTabPars.MaxTracks;
+                    htTabPars.Params.LastTrack = htTabPars.MaxTracks;
                     HtRead(true);
                     if(!diskReader.Aborted) HtSave();
                 }
@@ -2269,21 +2622,22 @@ namespace SpectrumArchiveReader
                 htTabPars.Params = new DiskReaderParams()
                 {
                     Image = htTabPars.Image,
+                    Drive = htTabPars.Drive,
                     DataRate = htTabPars.DataRate,
-                    SectorNumFrom = 0,
+                    FirstSectorNum = 0,
                     SectorReadAttempts = htTabPars.SectorReadAttempts,
                     Side = DiskSide.Both,
-                    TrackFrom = 0,
-                    TrackTo = htTabPars.MaxTracks,
+                    FirstTrack = 0,
+                    LastTrack = htTabPars.MaxTracks,
                     UpperSideHead = UpperSideHead.Head1,
                     TrackLayoutAutodetect = htTabPars.Image is TrDosImage
                 };
 
                 htTabPars.Params.UpperSideHeadAutodetect = htTabPars.Image is TrDosImage;
                 diskReader = new DiskReader(htTabPars.Params);
-                diskReader.OpenDriver();
+                if (!diskReader.OpenDriver()) return;
             }
-            diskReader.Params.SectorNumTo = Math.Min(htTabPars.Image.SizeSectors, htTabPars.MaxTracks * htTabPars.Image.StandardFormat.Layout.Cnt);
+            diskReader.Params.LastSectorNum = Math.Min(htTabPars.Image.SizeSectors, htTabPars.MaxTracks * htTabPars.Image.StandardFormat.Layout.Cnt);
             diskReader.Params.CurrentTrackFormat = htTabPars.Track0Format;
             for (int readCntr = 0; readCntr < htTabPars.NumberOfReads; readCntr++)
             {
@@ -2295,12 +2649,12 @@ namespace SpectrumArchiveReader
                     if (diskReader.Aborted) goto end;
                 }
                 readCntr++;
-                if (readCntr >= htTabPars.NumberOfReads || htTabPars.Image.BadSectors == 0) break;
+                if (readCntr >= htTabPars.NumberOfReads || htTabPars.Image.NotGoodSectors == 0) break;
                 diskReader.ReadBackward();
                 if (diskReader.Aborted) goto end;
-                if (htTabPars.Image.BadSectors == 0) break;
+                if (htTabPars.Image.NotGoodSectors == 0) break;
             }
-            if (htTabPars.RandomReadTurnedOn && htTabPars.Image.BadSectors > 0)
+            if (htTabPars.RandomReadTurnedOn && htTabPars.Image.NotGoodSectors > 0)
             {
                 diskReader.ReadRandomSectors(htTabPars.RandomReadTimeout, htTabPars.RandomReadStopOnNthFail);
                 if (diskReader.Aborted) goto end;
@@ -2397,23 +2751,14 @@ namespace SpectrumArchiveReader
             htTabPars.CurrentFileName = fullFileName;
             htTabPars.Image.ResetModify();
             htTabPars.Image.Name = nFileName;
-            Log.Info?.Out($"Файл сохранен. Sectors: {htTabPars.Image.FileSectorsSize} ({Math.Ceiling((double)htTabPars.Image.FileSectorsSize / htTabPars.Image.SectorsOnTrack)} tracks) | Good: {htTabPars.Image.GoodSectors} | Bad: {htTabPars.Image.BadSectors} | Имя: {fullFileName}");
-        }
-
-        private void HtRefreshControls()
-        {
-            if (htTabPars.Image != null)
-            {
-                htTabPars.Map.Repaint();
-                htTabPars.StatsTable.Repaint();
-            }
+            Log.Info?.Out($"Файл сохранен. Sectors: {htTabPars.Image.FileSectorsSize} ({Math.Ceiling((double)htTabPars.Image.FileSectorsSize / htTabPars.Image.SectorsOnTrack)} tracks) | Good: {htTabPars.Image.GoodSectors} | Bad: {htTabPars.Image.NotGoodSectors} | Имя: {fullFileName}");
         }
 
         private void C_HtAbort_Click(object sender, EventArgs e)
         {
             if (diskReader != null) diskReader.Aborted = true;
             htTabPars.Processing = false;
-            HtSetEnabled(true);
+            C_HtAbort.Enabled = false;
         }
 
         private void C_SelectSavePathTrDos_Click(object sender, EventArgs e)
@@ -2450,14 +2795,15 @@ namespace SpectrumArchiveReader
 
         public bool HtReadParameters()
         {
-            int trackTo;
+            int lastTrack;
             bool sraValid = Int32.TryParse(C_HtSectorReadAttempts.Text, out htTabPars.SectorReadAttempts) && htTabPars.SectorReadAttempts > 0;
-            bool tlValid = Int32.TryParse(C_HtMaxTracks.Text, out trackTo) && trackTo > 0 && trackTo <= MainForm.MaxTrack;
+            bool tlValid = Int32.TryParse(C_HtMaxTracks.Text, out lastTrack) && lastTrack > 0 && lastTrack <= MainForm.MaxTrack;
             C_HtSectorReadAttempts.BackColor = sraValid ? SystemColors.Window : Color.Red;
             C_HtMaxTracks.BackColor = tlValid ? SystemColors.Window : Color.Red;
-            if (tlValid) htTabPars.Map.TrackTo = trackTo;
+            if (tlValid) htTabPars.Map.LastTrack = lastTrack;
             htTabPars.Map.Repaint();
-            htTabPars.MaxTracks = trackTo;
+            htTabPars.MaxTracks = lastTrack;
+            htTabPars.Drive = C_HtDriveB.Checked ? Drive.B : Drive.A;
             htTabPars.DataRate = ReaderBase.DataRateArray[C_HtDataRate.SelectedIndex];
             bool disValid = Int32.TryParse(C_HtDefaultImageSize.Text, out htTabPars.DefaultImageSizeInTracks)
                 && htTabPars.DefaultImageSizeInTracks > 0
@@ -2494,6 +2840,8 @@ namespace SpectrumArchiveReader
             C_FileTypeTrDos.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.TrDosFileType, HtTabPars.TrDosFileTypes);
             C_FileTypeIsDos.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.IsDosFileType, HtTabPars.IsDosFileTypes);
             C_FileTypeCpm.SelectedIndex = HtTabPars.GetFileTypeIndex(htTabPars.CpmFileType, HtTabPars.CpmFileTypes);
+            C_HtDriveA.Checked = htTabPars.Drive == Drive.A;
+            C_HtDriveB.Checked = htTabPars.Drive == Drive.B;
             C_HtDataRate.SelectedIndex = HtTabPars.GetDataRateIndex(htTabPars.DataRate, ReaderBase.DataRateArray);
             C_HtSectorReadAttempts.Text = htTabPars.SectorReadAttempts.ToString();
             C_HtDefaultImageSize.Text = htTabPars.DefaultImageSizeInTracks.ToString();
@@ -2523,6 +2871,196 @@ namespace SpectrumArchiveReader
                 C_HtAbort_Click(null, null);
             }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void C_CfReadForward_Click(object sender, EventArgs e)
+        {
+            if (!CfReadParameters())
+            {
+                MessageBox.Show("Ошибка в параметрах.");
+                return;
+            }
+            customFormatTabPars.Processing = true;
+            MainForm_OperationStarted(customFormatTabPars, e);
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
+            {
+                try
+                {
+                    DiskReaderParams2 pars = new DiskReaderParams2()
+                    {
+                        Drive = customFormatTabPars.Drive,
+                        DataRate = customFormatTabPars.DataRate,
+                        Image = customFormatTabPars.Image,
+                        Map = customFormatTabPars.Map,
+                        SectorReadAttempts = customFormatTabPars.SectorReadAttempts,
+                        Side = customFormatTabPars.ReadSide,
+                        FirstTrack = customFormatTabPars.Map.FirstTrack,
+                        LastTrack = customFormatTabPars.Map.LastTrack
+                    };
+                    DiskReader2 dr = new DiskReader2(pars);
+                    customFormatTabPars.DiskReader = dr;
+                    dr.OpenDriver();
+                    if (sender == C_CfReadRandomSectors)
+                    {
+                        dr.ReadRandomSectors(TimeSpan.Zero);
+                    }
+                    else
+                    {
+                        dr.Read(customFormatTabPars.Scan, sender == C_CfReadForward);
+                    }
+                    dr.CloseDriver();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error?.Out($"Исключение: {ex.Message} | StackTrace: {ex.StackTrace}");
+                }
+            };
+            worker.RunWorkerCompleted += (object sender1, RunWorkerCompletedEventArgs ee) =>
+            {
+                customFormatTabPars.Processing = false;
+                MainForm_OperationCompleted(sender, e);
+            };
+            worker.RunWorkerAsync();
+        }
+
+        private void C_CfAbort_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.DiskReader != null) customFormatTabPars.DiskReader.Aborted = true;
+            customFormatTabPars.Processing = false;
+            C_CfAbort.Enabled = false;
+        }
+
+        private void C_CfSave_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.Image == null) return;
+            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "FDI File (*.fdi)|*.fdi" };
+            saveDialog.FileName = customFormatTabPars.Image.Name;
+            if (saveDialog.ShowDialog() != DialogResult.OK) return;
+            File.WriteAllBytes(saveDialog.FileName, customFormatTabPars.Image.ToFdi(null));
+            customFormatTabPars.Image.ResetModify();
+            DiskImage2 image = customFormatTabPars.Image;
+            Log.Info?.Out($"Образ сохранен. Имя: {image.Name} | треков: {image.SizeTracks} | Секторов: {image.SizeSectors} | Good: {image.GoodSectors} | Bad: {image.BadSectors} | FileName: {saveDialog.FileName}");
+        }
+
+        private void C_CfLoadImage_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.Image != null && customFormatTabPars.Image.Modified)
+            {
+                if (MessageBox.Show("Образ не был сохранен. Продолжить?", "", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            }
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "FDI (*.fdi)|*.fdi|TRD (*.trd)|*.trd|Modified TRD (*.trd)|*.trd|All Files (*.*)|*.*" };
+            openDialog.FilterIndex = 4;
+            if (openDialog.ShowDialog() != DialogResult.OK) return;
+            int result;
+            DiskImage2 image = customFormatTabPars.Image;
+            result = image.LoadAutodetect(openDialog.FileName, openDialog.FilterIndex == 3);
+            if (result != 0)
+            {
+                Log.Error?.Out($"Ошибка при чтении файла: {openDialog.FileName}");
+                return;
+            }
+            //customFormatTabPars.Image = image;
+            //customFormatTabPars.Map.Image = image;
+            //stats.Image = image;
+            customFormatTabPars.Map.Repaint();
+            customFormatTabPars.StatsTable.Repaint();
+            //SetEnabled();
+            Log.Info?.Out($"Образ загружен. Имя: {image.Name} | Размер: {image.SizeTracks} треков | FileName: {openDialog.FileName}");
+        }
+
+        private void C_CfClearImage_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.Image != null && customFormatTabPars.Image.Modified)
+            {
+                if (MessageBox.Show("Образ не был сохранен. Продолжить?", "", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            }
+            customFormatTabPars.Image.Clear();
+            customFormatTabPars.Map.Repaint();
+        }
+
+        protected void CfSetEnabled(bool parsValid)
+        {
+            C_CfReadForward.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing && parsValid;
+            C_CfReadBackward.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing && parsValid;
+            C_CfReadRandomSectors.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing && parsValid;
+            C_CfSave.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing && customFormatTabPars.Image != null;
+            C_CfLoadImage.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+            C_CfClearImage.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+            //C_CfRescan.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+            //C_CfDataRate.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+            //C_CfReadSide.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+            C_CfAbort.Enabled = customFormatTabPars.Enabled && customFormatTabPars.Processing;
+            //C_CfSectorReadAttempts.Enabled = customFormatTabPars.Enabled && !customFormatTabPars.Processing;
+        }
+
+        public bool CfReadParameters()
+        {
+            bool sraValid = Int32.TryParse(C_CfSectorReadAttempts.Text, out customFormatTabPars.SectorReadAttempts) && customFormatTabPars.SectorReadAttempts > 0;
+            C_CfSectorReadAttempts.BackColor = sraValid ? SystemColors.Window : Color.Red;
+            customFormatTabPars.Map.Repaint();
+            customFormatTabPars.Drive = (Drive)C_CfDrive.SelectedIndex;
+            customFormatTabPars.DataRate = ReaderBase.DataRateArray[C_CfDataRate.SelectedIndex];
+            customFormatTabPars.ReadSide = (DiskSide)C_CfReadSide.SelectedIndex;
+            customFormatTabPars.Scan = (ScanMode)C_CfScanMode.SelectedIndex;
+            return sraValid;
+        }
+
+        public void CfFillParameters()
+        {
+            customFormatTabPars.ParametersChanging = true;
+            C_CfReadSide.SelectedIndex = (int)customFormatTabPars.ReadSide;
+            C_CfScanMode.SelectedIndex = (int)customFormatTabPars.Scan;
+            C_CfDrive.SelectedIndex = (int)customFormatTabPars.Drive;
+            C_CfDataRate.SelectedIndex = HtTabPars.GetDataRateIndex(customFormatTabPars.DataRate, ReaderBase.DataRateArray);
+            C_CfSectorReadAttempts.Text = customFormatTabPars.SectorReadAttempts.ToString();
+            customFormatTabPars.Map.FirstTrack = customFormatTabPars.FirstTrack;
+            customFormatTabPars.Map.LastTrack = customFormatTabPars.LastTrack;
+            customFormatTabPars.ParametersChanging = false;
+        }
+
+        private void C_CfSectorReadAttempts_TextChanged(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.ParametersChanging) return;
+            CfSetEnabled(CfReadParameters());
+        }
+
+        private void C_CfSaveFormat_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.Image == null) return;
+            SaveFileDialog saveDialog = new SaveFileDialog() { Filter = "Xml Files (*.xml)|*.xml|All Files (*.*)|*.*" };
+            saveDialog.FileName = customFormatTabPars.Image.Name;
+            if (saveDialog.ShowDialog() != DialogResult.OK) return;
+            string file = customFormatTabPars.Image.SaveFormatToXml();
+            File.WriteAllText(saveDialog.FileName, file);
+            Log.Info?.Out($"Формат сохранен: {saveDialog.FileName}");
+        }
+
+        private void C_CfLoadFormat_Click(object sender, EventArgs e)
+        {
+            if (customFormatTabPars.Image == null) return;
+            OpenFileDialog openDialog = new OpenFileDialog() { Filter = "Xml Files (*.xml)|*.xml|All Files (*.*)|*.*" };
+            if (openDialog.ShowDialog() != DialogResult.OK) return;
+            customFormatTabPars.Image.LoadFormatFromXml(openDialog.FileName);
+            customFormatTabPars.Map.Repaint();
+            Log.Info?.Out($"Формат загружен: {openDialog.FileName}");
+        }
+
+        private void C_Test2_Click(object sender, EventArgs e)
+        {
+            // /bg_track_sectorNumber_sizeCode_head_dataRate
+            int track = 28;
+            for (int i = 0; i < 5; i++)
+            {
+                //IntPtr driverHandlex = Driver.Open();
+                //Driver.Seek(driverHandlex, track);
+                //Driver.Close(driverHandlex);
+
+                Process process = Process.Start(Application.ExecutablePath, $"/bg_{track}_{1}_{1}_{track & 1}_{(int)DataRate.FD_RATE_250K} /logfile");
+                Thread.Sleep(5000);
+
+                track++;
+            }
         }
     }
 }

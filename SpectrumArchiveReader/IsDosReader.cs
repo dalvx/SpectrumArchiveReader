@@ -71,7 +71,7 @@ namespace SpectrumArchiveReader
             if (saveDialog.ShowDialog() != DialogResult.OK) return;
             File.WriteAllBytes(saveDialog.FileName, IsDosImage.ToFdi(null, 0));
             Image.ResetModify();
-            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
+            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.NotGoodSectors} | FileName: {saveDialog.FileName}");
         }
 
         private void LoadImage(object sender, EventArgs e)
@@ -128,7 +128,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadForward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -156,7 +156,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadBackward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -184,7 +184,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadRandomSectors(TimeSpan.Zero);
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");

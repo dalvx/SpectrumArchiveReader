@@ -87,8 +87,8 @@ namespace SpectrumArchiveReader
             int successfullyRead = 0;
             DiskReaderParams npars = new DiskReaderParams()
             {
-                SectorNumFrom = 0,
-                SectorNumTo = 9,
+                FirstSectorNum = 0,
+                LastSectorNum = 9,
                 DataRate = Params.DataRate,
                 Image = new TrDosImage(9, null),
                 SectorReadAttempts = Params.SectorReadAttempts,
@@ -103,7 +103,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     successfullyRead = diskReader.ReadForward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Чтение каталога завершено. Успешно прочитанных секторов: {successfullyRead}");
@@ -162,7 +162,7 @@ namespace SpectrumArchiveReader
                 File.WriteAllBytes(saveDialog.FileName, TrDosImage.ToTrd(32, true));
             }
             Image.ResetModify();
-            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
+            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.NotGoodSectors} | FileName: {saveDialog.FileName}");
         }
 
         private void LoadImage(object sender, EventArgs e)
@@ -253,7 +253,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadForward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -281,7 +281,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadBackward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -309,7 +309,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadRandomSectors(TimeSpan.Zero, 10);
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");

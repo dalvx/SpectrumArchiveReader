@@ -63,7 +63,10 @@ namespace SpectrumArchiveReader
             }
         }
 
-        public int BadSectors
+        /// <summary>
+        /// Количество секторов Bad и NoHeader.
+        /// </summary>
+        public int NotGoodSectors
         {
             get
             {
@@ -72,6 +75,20 @@ namespace SpectrumArchiveReader
                 for (int i = 0; i < Sectors.Length; i++)
                 {
                     if (Sectors[i] == SectorProcessResult.Bad || Sectors[i] == SectorProcessResult.NoHeader) cnt++;
+                }
+                return cnt;
+            }
+        }
+
+        public int BadSectors
+        {
+            get
+            {
+                if (Sectors == null) return 0;
+                int cnt = 0;
+                for (int i = 0; i < Sectors.Length; i++)
+                {
+                    if (Sectors[i] == SectorProcessResult.Bad) cnt++;
                 }
                 return cnt;
             }
@@ -137,11 +154,11 @@ namespace SpectrumArchiveReader
 
         }
 
-        public int GetNotGoodBounds(int sectorNumFrom, int sectorNumTo, DiskSide side, ref int begin, ref int end)
+        public int GetNotGoodBounds(int firstSectorNum, int lastSectorNum, DiskSide side, ref int begin, ref int end)
         {
             int cntr = 0;
             int b = -1;
-            for (int i = sectorNumFrom; i < sectorNumTo; i++)
+            for (int i = firstSectorNum; i < lastSectorNum; i++)
             {
                 if (Sectors[i] == SectorProcessResult.Good) continue;
                 int track = i / SectorsOnTrack;
@@ -223,7 +240,11 @@ namespace SpectrumArchiveReader
                     trackOffset = *((int*)d);
                 }
                 int sectorsOnTrack = data[index + 6];
-                if (sectorsOnTrack != SectorsOnTrack) return 2;
+                if (sectorsOnTrack > SectorsOnTrack) return 2;
+                for (int sectorNum = track * SectorsOnTrack; sectorNum < (track + 1) * SectorsOnTrack; sectorNum++)
+                {
+                    Sectors[sectorNum] = SectorProcessResult.NoHeader;
+                }
                 index += 7;
                 for (int sector = 0; sector < sectorsOnTrack; sector++)
                 {
@@ -258,8 +279,8 @@ namespace SpectrumArchiveReader
             int trackCount = (int)Math.Ceiling((double)Math.Max(FileSectorsSize, minSizeSectors) / SectorsOnTrack);
             int cylCount = (int)Math.Ceiling(trackCount / 2.0);
             int textLength = text != null ? text.Length : 0;
-            int trackCountFromCyl = cylCount * 2;
-            int dataSize = trackCountFromCyl * SectorsOnTrack * SectorSize + textLength + 1 + 7 * trackCountFromCyl + trackCountFromCyl * SectorsOnTrack * 7 + 14;
+            int totalExistingSectors = GoodSectors + BadSectors;
+            int dataSize = totalExistingSectors * SectorSize + textLength + 1 + 7 * cylCount * 2 + totalExistingSectors * 7 + 14;
             byte[] data = new byte[dataSize];
             data[0] = (byte)'F';
             data[1] = (byte)'D';
@@ -271,23 +292,32 @@ namespace SpectrumArchiveReader
             //data[12] = 0; // Длина дополнительной информации в заголовке, 2 байта. В этой версии - 0.
             //data[14] = 0; // Дополнительная информация ("Резерв для дальнейшей модернизации"). В текущей версии формата отсутствует.
             int index = 14;
+            int trackOffset = 0;
             for (int track = 0; track < cylCount * 2; track++)
             {
+                int sectorCount = 0;
+                for (int sector = track * SectorsOnTrack; sector < (track + 1) * SectorsOnTrack; sector++)
+                {
+                    if (sector < Sectors.Length && (Sectors[sector] == SectorProcessResult.Good || Sectors[sector] == SectorProcessResult.Bad)) sectorCount++;
+                }
+
                 fixed (byte* numRef = &data[index])
                 {
-                    *((int*)numRef) = track * SectorsOnTrack * SectorSize;
+                    // Смещение трека - начало области данных этого трека относительно "Смещения данных" 
+                    *((int*)numRef) = trackOffset;
                 }
                 //data[index + 4] = 0;  // 2 байта, всегда содержит 0 (резерв для модернизации формата).
-                data[index + 6] = (byte)SectorsOnTrack;
+                data[index + 6] = (byte)sectorCount;
                 index += 7;
                 int sectorOffset = 0;
                 for (int sector = 0; sector < SectorsOnTrack; sector++)
                 {
+                    int sectorNum = track * SectorsOnTrack + sector;
+                    if (sectorNum >= Sectors.Length || (Sectors[sectorNum] != SectorProcessResult.Good && Sectors[sectorNum] != SectorProcessResult.Bad)) continue;
                     data[index] = (byte)(track / 2);
                     data[index + 1] = (byte)(track & 1);
                     data[index + 2] = (byte)StandardFormat.Layout.Data[sector].SectorNumber;
                     data[index + 3] = (byte)StandardFormat.Layout.Data[sector].SizeCode;
-                    int sectorNum = track * SectorsOnTrack + sector;
                     data[index + 4] = (byte)(sectorNum >= Sectors.Length || Sectors[sectorNum] == SectorProcessResult.Good ? 1 << StandardFormat.Layout.Data[sector].SizeCode : 0);
                     fixed (byte* numRef = &data[index + 5])
                     {
@@ -296,6 +326,7 @@ namespace SpectrumArchiveReader
                     sectorOffset += StandardFormat.Layout.Data[sector].SizeBytes;
                     index += 7;
                 }
+                trackOffset += sectorOffset;
             }
             int textOffset = index;
             if (textLength > 0) Encoding.ASCII.GetBytes(text, 0, text.Length, data, textOffset);
@@ -312,6 +343,7 @@ namespace SpectrumArchiveReader
                 for (int sector = 0; sector < SectorsOnTrack; sector++)
                 {
                     int sectorNum = track * SectorsOnTrack + sector;
+                    if (sectorNum >= Sectors.Length || (Sectors[sectorNum] != SectorProcessResult.Good && Sectors[sectorNum] != SectorProcessResult.Bad)) continue;
                     if (sectorNum < sizeSectors) Array.Copy(Data, sectorNum * SectorSize, data, currentSectorNum * SectorSize + dataOffset, SectorSize);
                     currentSectorNum++;
                 }
@@ -355,6 +387,13 @@ namespace SpectrumArchiveReader
                     {
                         Sectors[i] = SectorProcessResult.Good;
                     }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < last; i++)
+                {
+                    Sectors[i] = SectorProcessResult.Good;
                 }
             }
             for (int i = last; i < sizeSectors; i++)

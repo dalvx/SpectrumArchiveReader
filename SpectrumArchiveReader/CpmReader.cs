@@ -80,7 +80,7 @@ namespace SpectrumArchiveReader
                 File.WriteAllBytes(saveDialog.FileName, CpmImage.ToFdi(null, 0));
             }
             Image.ResetModify();
-            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.BadSectors} | FileName: {saveDialog.FileName}");
+            Log.Info?.Out($"Образ сохранен. Имя: {Image.Name} | Секторов: {Image.FileSectorsSize} | Good: {Image.GoodSectors} | Bad: {Image.NotGoodSectors} | FileName: {saveDialog.FileName}");
         }
 
         private void ReadForward(object sender, EventArgs e)
@@ -94,7 +94,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadForward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -122,7 +122,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadBackward();
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
@@ -150,7 +150,7 @@ namespace SpectrumArchiveReader
             {
                 try
                 {
-                    diskReader.OpenDriver();
+                    if (!diskReader.OpenDriver()) return;
                     int successfullyRead = diskReader.ReadRandomSectors(TimeSpan.Zero);
                     diskReader.CloseDriver();
                     Log.Info?.Out($"Успешно прочитанных секторов: {successfullyRead}");
