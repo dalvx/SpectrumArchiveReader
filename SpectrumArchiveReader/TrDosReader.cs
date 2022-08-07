@@ -97,6 +97,7 @@ namespace SpectrumArchiveReader
                 ReadMode = ReadMode.Standard,
                 TrackLayoutAutodetect = false,
                 UpperSideHeadAutodetect = false,
+                Drive = Params.Drive
             };
             diskReader = new DiskReader() { Params = npars };
             worker.DoWork += (object sndr, DoWorkEventArgs ee) =>
